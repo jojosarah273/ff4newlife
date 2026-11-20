@@ -446,8 +446,6 @@ static void wp_pass(uint32_t *out, int ou, int ov)
 
     if (!wp_loaded)
         return;
-    for (cyy = cy0; cyy <= cy0 + ov / 16; ++cxx == 0 ? 0 : 0)
-        ;
     for (cyy = cy0; cyy <= cy0 + ov / 16 + 1; ++cyy)
         for (cxx = cx0; cxx <= cx0 + ou / 16 + 1; ++cxx) {
             int cx = cxx & (wp_w - 1), cy = cyy & (wp_h - 1);
@@ -485,3 +483,804 @@ static void wp_pass(uint32_t *out, int ou, int ov)
         }
 }
 
+
+/* ================================================================== */
+/*  ENGINE BODY - recovery stage 1 (the world view)                   */
+/*                                                                    */
+/*  Everything below was rebuilt after the truncation incident        */
+/*  (commit 2d695b5).  Stage 1 scope: boot, camera, movement, the      */
+/*  world view from the .ff4world packs (wp_pass) with the .idx/.pal  */
+/*  compose_view as the A/B fallback (FF4_NOWORLDPACK=1), the actor    */
+/*  sprite from the ROM's PlayerSpriteTiles, the lava palette cycle   */
+/*  (UpdateLavaPal @c4cd), and the [wtile] cell reporter.             */
+/*                                                                    */
+/*  Guards that lock this stage: verify_world_report.py,              */
+/*  verify_lava_pal.py, and the pack-vs-idx A/B screenshot test.      */
+/*  Sub-maps (FF4_WARPTO) return in stage 2.                           */
+/* ================================================================== */
+
+static uint8_t *read_file(const char *path, size_t *len)
+{
+    char full[512];
+    FILE *f;
+    long n;
+    uint8_t *buf;
+
+    if (!ff4_resolve_path(path, full, sizeof full))
+        return NULL;
+    f = fopen(full, "rb");
+    if (!f)
+        return NULL;
+    fseek(f, 0, SEEK_END);
+    n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    buf = (uint8_t *)malloc(n ? n : 1);
+    if (n && fread(buf, 1, n, f) != (size_t)n) {
+        fclose(f);
+        free(buf);
+        return NULL;
+    }
+    fclose(f);
+    if (len)
+        *len = n;
+    return buf;
+}
+
+/* ----------------------- world map data -------------------------- */
+
+typedef struct World {
+    const char *name;          /* display name for [wtile] reports */
+    const char *stem;          /* file stem (lowercase) */
+    const char *file;          /* data/world/<stem>.png */
+    FF4_GfxSurface img;        /* the composed world PNG (whole-map view) */
+    int loaded;
+    uint8_t *idx;              /* (cells*16)^2 palette indices, 1 byte/px */
+    uint8_t *pal;              /* 64 RGBA colors as stored */
+    uint8_t *work_pal;         /* pal copy with the lava cycle applied */
+    uint8_t *lavapal;          /* 4 sets x 8 BGR555 (underground only) */
+    int idx_w, idx_h;          /* pixels */
+    int cells;                 /* map cells per side */
+    uint8_t *walk;             /* cells*cells byte1 per cell */
+    uint8_t *tiles;            /* cells*cells composed tile per cell */
+    uint8_t *base;             /* composed tile -> 4 base tiles (128*4) */
+    uint8_t *assign;           /* base tile -> palette base (256) */
+    uint8_t *props;            /* cells*cells byte2 per cell */
+} World;
+
+/* the world map is 256x256 cells (4096x4096 px); the moon is 64x64
+ * (1024x1024 px).  Cell = one 16x16 composed tile. */
+static World worlds[3] = {
+    { .name = "Overworld",   .stem = "overworld",
+      .file = "data/world/overworld.png" },
+    { .name = "Underground", .stem = "underground",
+      .file = "data/world/underground.png" },
+    { .name = "Moon",        .stem = "moon",
+      .file = "data/world/moon.png" },
+};
+static int cur = 0;                 /* current world index */
+static World *W = &worlds[0];
+
+/* world pixel position of the party (the sprite is centred on it) */
+static double ax = 15 * 16 + 8, ay = 16 * 16 + 8;
+
+/* LavaPalTbl (field/pal_anim.asm @c4e0): one step every 16 frames,
+ * full cycle 128 frames.  Steps 0..7 select LavaAnimPal sets. */
+static const uint8_t lava_pal_tbl[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+/* FF4_LAVASTEP pins the step index (0..7); -1 = natural cadence */
+static int lava_step_env = -1;
+
+/* UpdateLavaPal @c4cd: the underground cycles the 8 colors at
+ * palette entries 18..25 (CGRAM group 1) through 4 sets of
+ * LavaAnimPal.  Set k lives at lavapal[k*16 .. k*16+15] as BGR555. */
+static void world_patch_palette(World *w, int step)
+{
+    int k;
+
+    if (!w->lavapal)
+        return;
+    if (step < 0 || step > 7)
+        step = 0;
+    for (k = 0; k < 8; ++k) {
+        unsigned v = w->lavapal[lava_pal_tbl[step] * 16 + k * 2] |
+                     ((unsigned)w->lavapal[lava_pal_tbl[step] * 16 + k * 2 + 1] << 8);
+        unsigned r = ((v & 0x1F) << 3) | ((v >> 2) & 7);
+        unsigned g = (((v >> 5) & 0x1F) << 3) | ((v >> 7) & 7);
+        unsigned b = (((v >> 10) & 0x1F) << 3) | ((v >> 12) & 7);
+
+        w->work_pal[(18 + k) * 4 + 0] = (uint8_t)r;
+        w->work_pal[(18 + k) * 4 + 1] = (uint8_t)g;
+        w->work_pal[(18 + k) * 4 + 2] = (uint8_t)b;
+        w->work_pal[(18 + k) * 4 + 3] = 0xFF;
+    }
+}
+
+/* keep the pack's palette in sync with the lava cycle (wp_pass reads
+ * wp_pal directly; entries 18..25 are the cycled ones) */
+static void lava_sync_pack(World *w)
+{
+    if (wp_loaded && wp_pal && w->work_pal)
+        memcpy(wp_pal + 18 * 4, w->work_pal + 18 * 4, 8 * 4);
+}
+
+static int load_world(int n)
+{
+    World *w = &worlds[n];
+    char p[512];
+
+    if (w->loaded)
+        return 0;
+    if (n < 0 || n > 2)
+        return -1;
+    if (ff4_image_load(w->file, &w->img) != 0) {
+        fprintf(stderr, "[world] cannot load %s\n", w->file);
+        return -1;
+    }
+    snprintf(p, sizeof p, "data/world/%s.idx", w->stem);
+    w->idx = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.pal", w->stem);
+    w->pal = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.walk", w->stem);
+    w->walk = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.tiles", w->stem);
+    w->tiles = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.base", w->stem);
+    w->base = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.assign", w->stem);
+    w->assign = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.props", w->stem);
+    w->props = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/world/%s.lavapal", w->stem);
+    w->lavapal = read_file(p, NULL);
+
+    w->cells = (n == 2) ? 64 : 256;
+    w->idx_w = w->idx_h = w->cells * 16;
+
+    if (!w->idx || !w->pal) {
+        fprintf(stderr, "[world] %s missing .idx/.pal data\n", w->name);
+        return -1;
+    }
+    w->work_pal = (uint8_t *)malloc(64 * 4);
+    memcpy(w->work_pal, w->pal, 64 * 4);
+    world_patch_palette(w, 0);
+
+    /* the per-world pack (data/world/<name>.ff4world); FF4_NOWORLDPACK
+     * forces the compose_view (.idx/.pal) path for the A/B check */
+    wp_free();
+    wp_loaded = 0;
+    if (getenv("FF4_NOWORLDPACK"))
+        printf("[world] pack disabled (FF4_NOWORLDPACK), compose_view path\n");
+    else if (wp_load(w->stem) != 0)
+        printf("[world] no pack for %s, compose_view path\n", w->name);
+    lava_sync_pack(w);
+
+    cur = n;
+    W = w;
+    w->loaded = 1;
+    return 0;
+}
+
+/* on-foot world passability (CheckPlayerMoveWorld, move.asm): the
+ * walk table holds byte1 per cell; bit 1 is walkable on foot.  The
+ * recorded V/B cell reports agree (byte1 0x02/0x03 pass, 0x00/0x01
+ * blocked).  FF4_NOCLIP bypasses. */
+static int world_passable(int cx, int cy)
+{
+    if (noclip || !W->walk)
+        return 1;
+    if (cx < 0 || cy < 0 || cx >= W->cells || cy >= W->cells)
+        return 0;
+    return (W->walk[(size_t)cy * W->cells + cx] & 0x02) ? 1 : 0;
+}
+
+/* -------------------------- camera -------------------------------- */
+
+/* camera keeps the actor centred, clamped to the world bounds */
+static void update_camera(void)
+{
+    cam_x = ax - vw / 2.0;
+    cam_y = ay - vh / 2.0;
+    if (cam_x < 0) cam_x = 0;
+    if (cam_y < 0) cam_y = 0;
+    if (cam_x > W->idx_w - vw) cam_x = W->idx_w - vw;
+    if (cam_y > W->idx_h - vh) cam_y = W->idx_h - vh;
+}
+
+/* ------------------------- actor sprite --------------------------- */
+
+/* PlayerSpriteTiles @c0c4 (ROM, byte-verified): frame = facing*2+step,
+ * each frame = 4 bytes (tile, attrs).  Attrs bit 6 (0x40) = hflip.
+ * Facing from move.asm $1705: 0=up 1=right 2=down 3=left. */
+static const uint8_t player_sprite_tiles[8][8] = {
+    /* facing 0 = up */
+    { 4,0x20, 5,0x20, 6,0x20, 7,0x20 },
+    { 4,0x20, 5,0x20, 7,0x60, 6,0x60 },
+    /* facing 1 = right (side art hflipped) */
+    { 9,0x60, 8,0x60,11,0x60,10,0x60 },
+    {13,0x60,12,0x60,15,0x60,14,0x60 },
+    /* facing 2 = down */
+    { 0,0x20, 1,0x20, 2,0x20, 3,0x20 },
+    { 0,0x20, 1,0x20, 3,0x60, 2,0x60 },
+    /* facing 3 = left */
+    { 8,0x20, 9,0x20,10,0x20,11,0x20 },
+    {12,0x20,13,0x20,14,0x20,15,0x20 },
+};
+
+/* party leader = mapSpriteGraphics slot 0 (Cecil), palette from
+ * map_sprite_slots.bin slot 0 (pal 1).  The sheet is 4bpp SNES
+ * planar, expanded at load to 64 index bytes per tile. */
+static uint8_t *spr_sheet;          /* tiles*64 palette indices, MSB-left */
+static int spr_sheet_len;
+static uint8_t spr_rgba[8][4];       /* 8 colors RGBA from npcPalettes[n] */
+static int spr_loaded;
+
+/* facing & animation state ($1705, $7b, $06 in DrawPlayerSub) */
+static int facing = 2;              /* down */
+static int moving;                  /* $ab */
+static int party_frame;             /* $7b */
+static int move_phase;              /* $ab bit 0 analogue */
+
+static void sprite_load(int sheet, int pal)
+{
+    char p[512];
+    uint8_t *raw;
+    size_t rawlen = 0;
+    int nt, t;
+
+    snprintf(p, sizeof p, "data/gfx/gfx/mapSpriteGraphics[%d].bin", sheet);
+    raw = read_file(p, &rawlen);
+    if (!raw) {
+        fprintf(stderr, "[sprite] missing %s\n", p);
+        return;
+    }
+    /* the rip stores these sheets already expanded: one palette index
+     * per byte, logical (screen) order, 64 bytes per 8x8 tile - so
+     * logical tile T is at T*64 (the old engine's sprite_blit rule) */
+    if (rawlen % 64) {
+        fprintf(stderr, "[sprite] %s: bad size %lu\n", p,
+                (unsigned long)rawlen);
+        free(raw);
+        return;
+    }
+    nt = (int)(rawlen / 64);
+    free(spr_sheet);
+    spr_sheet = raw;                 /* take ownership */
+    spr_sheet_len = nt;
+    (void)t;
+
+    snprintf(p, sizeof p, "data/gfx/gfx/npcPalettes[%d].bin", pal);
+    raw = read_file(p, NULL);
+    if (raw) {
+        memcpy(spr_rgba, raw, 8 * 4);
+        free(raw);
+    } else {
+        fprintf(stderr, "[sprite] missing %s\n", p);
+        return;
+    }
+    spr_loaded = 1;
+}
+
+/* data/map_sprite_slots.bin: 384 maps x 4 slots x (sheet, pal) */
+static int sm_slot_sheet[4], sm_slot_pal[4];
+
+static void load_sprite_slots(void)
+{
+    uint8_t *d = read_file("data/map_sprite_slots.bin", NULL);
+    int k;
+
+    if (!d)
+        return;
+    for (k = 0; k < 4; ++k) {
+        sm_slot_sheet[k] = d[0 * 8 + k * 2];
+        sm_slot_pal[k]   = d[0 * 8 + k * 2 + 1];
+    }
+    free(d);
+}
+
+/* draw one 8x8 sprite tile at (x, y) scale z, mirroring horizontally
+ * if flip.  Color 0 is transparent. */
+static void spr_tile(SDL_Renderer *r, int tile, int flip,
+                     int x, int y, double z)
+{
+    const uint8_t *t = spr_sheet + (size_t)tile * 64;
+    int px, py;
+
+    if (!spr_loaded || tile < 0 || tile >= spr_sheet_len)
+        return;
+    for (py = 0; py < 8; ++py)
+        for (px = 0; px < 8; ++px) {
+            int sx = flip ? 7 - px : px;
+            int ci = t[py * 8 + px];
+
+            if (!ci)
+                continue;
+            SDL_SetRenderDrawColor(r, spr_rgba[ci][0], spr_rgba[ci][1],
+                                   spr_rgba[ci][2], 0xFF);
+            SDL_RenderFillRect(r, &(SDL_Rect){ x + (int)(sx * z),
+                                               y + (int)(py * z),
+                                               (int)(z + 0.5),
+                                               (int)(z + 0.5) });
+        }
+}
+
+/* DrawPlayerSub @b284: frame index = facing*2 + step, the four
+ * subtiles are laid out 2x2 (top pair = head, bottom pair = feet);
+ * $06 = 1 while stepping (the 1px walk bob). */
+static void draw_actor(SDL_Renderer *r, int sx, int sy, double z)
+{
+    int frame = facing * 2 + (moving && (party_frame & 8) ? 1 : 0);
+    int bob = (moving && !(move_phase & 1) && (party_frame & 8)) ? 1 : 0;
+    int k;
+
+    if (frame < 0 || frame > 7)
+        frame = 0;
+    sx -= (int)(bob * z);
+    sy -= (int)(bob * z);
+    for (k = 0; k < 4; ++k) {
+        int tile = player_sprite_tiles[frame][k * 2];
+        int flip = (player_sprite_tiles[frame][k * 2 + 1] & 0x40) ? 1 : 0;
+
+        spr_tile(r, tile, flip,
+                 sx + (int)((k % 2) * 8 * z), sy + (int)((k / 2) * 8 * z), z);
+    }
+}
+
+/* ---------------------- the world viewport ------------------------ */
+
+/* compose the viewport from .idx + work_pal (the pre-pack path; the
+ * A/B reference for wp_pass).  The .idx file is the composed world
+ * ALREADY assign-shifted - its bytes are final palette indices, the
+ * same values wp_pass computes as (raw art + assign) % 64 - so a
+ * pixel maps directly: ci = idx[px].  Proven against the reference
+ * world PNGs by tools/ff4data.py --verify. */
+static void compose_view(World *w, int cx, int cy, uint32_t *out,
+                          int ou, int ov)
+{
+    int x, y;
+
+    for (y = 0; y < ov; ++y) {
+        int sy = cy + y;
+
+        if (sy < 0 || sy >= w->idx_h) {
+            for (x = 0; x < ou; ++x)
+                out[(size_t)y * ou + x] = 0xFF000000u;
+            continue;
+        }
+        for (x = 0; x < ou; ++x) {
+            int sx = cx + x;
+            uint8_t ci;
+
+            if (sx < 0 || sx >= w->idx_w)
+                ci = 0;
+            else
+                ci = w->idx[(size_t)sy * w->idx_w + sx];
+            out[(size_t)y * ou + x] =
+                0xFF000000u | ((uint32_t)w->work_pal[ci * 4 + 0] << 16) |
+                ((uint32_t)w->work_pal[ci * 4 + 1] << 8) |
+                w->work_pal[ci * 4 + 2];
+        }
+    }
+}
+
+/* whole-map view (T): the composed PNG scaled to fit the window */
+static void draw_whole_map(SDL_Renderer *r)
+{
+    SDL_Texture *tex;
+    double s = (win_w < (double)win_h * W->img.w / W->img.h)
+                   ? (double)win_w / W->img.w
+                   : (double)win_h / W->img.h;
+    int dw = (int)(W->img.w * s), dh = (int)(W->img.h * s);
+
+    tex = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888,
+                            SDL_TEXTUREACCESS_STATIC, W->img.w, W->img.h);
+    SDL_UpdateTexture(tex, NULL, W->img.pixels, (size_t)W->img.w * 4);
+    SDL_RenderCopy(r, tex, NULL,
+                  &(SDL_Rect){ (win_w - dw) / 2, (win_h - dh) / 2, dw, dh });
+    SDL_DestroyTexture(tex);
+}
+
+/* ------------------- the [wtile] cell reporter --------------------- */
+/* V/B tile reporter (data/world/water_tiles.txt).  The batch hook
+ * FF4_REPORT_CELL="<world> x,y x,y ..." replays recorded sessions
+ * (verify_world_report.py); interactive V reports the cursor cell.  */
+
+/* water band (data/world/water_tiles.txt): the same base tiles in
+ * every world - 0x80..0x9f plus foam 0xac/0xad. */
+static int world_base_is_water(int bt)
+{
+    return (bt >= 0x80 && bt <= 0x9F) || bt == 0xAC || bt == 0xAD;
+}
+
+/* engine-defined cell fingerprint: FNV-1a over the 16x16 .idx block */
+static uint32_t world_cell_fp(World *w, int cx, int cy)
+{
+    uint32_t h = 2166136261u;
+    int y, x;
+
+    for (y = 0; y < 16; ++y) {
+        const uint8_t *row = w->idx + (size_t)(cy * 16 + y) * w->idx_w + cx * 16;
+
+        for (x = 0; x < 16; ++x) {
+            h ^= row[x];
+            h *= 16777619u;
+        }
+    }
+    return h;
+}
+
+static int tile_report;      /* V mode on */
+static int cur_cx, cur_cy;   /* the report cursor, in cells */
+
+static void report_world_cell(FILE *log, int cx, int cy)
+{
+    World *w = W;
+    int comp = w->tiles[(size_t)cy * w->cells + cx];
+    int b[4], nw = 0, k;
+    char base_txt[128];
+    uint32_t fp;
+    int nx[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+    int ny[8] = { -1,-1,-1,  0, 0,  1, 1, 1 };
+
+    for (k = 0; k < 4; ++k) {
+        b[k] = w->base[comp * 4 + k];
+        if (world_base_is_water(b[k]))
+            ++nw;
+    }
+    fp = world_cell_fp(w, cx, cy);
+    snprintf(base_txt, sizeof base_txt,
+             "%d(0x%02X%s),%d(0x%02X%s),%d(0x%02X%s),%d(0x%02X%s)",
+             b[0], b[0], world_base_is_water(b[0]) ? "W" : "",
+             b[1], b[1], world_base_is_water(b[1]) ? "W" : "",
+             b[2], b[2], world_base_is_water(b[2]) ? "W" : "",
+             b[3], b[3], world_base_is_water(b[3]) ? "W" : "");
+
+    /* one-line echo on stdout (verify_world_report greps this) */
+    printf("[wtile] cell=(%d,%d) composed=%d (0x%02X) base=%s water=%d/4\n",
+           cx, cy, comp, comp, base_txt, nw);
+
+    /* full block: stdout + FF4_CELLFILE log */
+    printf("[wtile] world=%d (%s) at (%d,%d) composed=%d (0x%02X)\n",
+           cur, w->name, cx, cy, comp, comp);
+    if (log) {
+        fprintf(log, "[wtile] world=%d (%s) at (%d,%d) composed=%d (0x%02X)\n",
+                cur, w->name, cx, cy, comp, comp);
+        fprintf(log, "  base=%s water=%d/4 fp=%08X\n", base_txt, nw, fp);
+        fprintf(log, "  neighbours:");
+        for (k = 0; k < 8; ++k) {
+            int x = cx + nx[k], y = cy + ny[k];
+
+            if (x < 0 || y < 0 || x >= w->cells || y >= w->cells)
+                fprintf(log, " -1");
+            else
+                fprintf(log, " %d", w->tiles[(size_t)y * w->cells + x]);
+        }
+        fprintf(log, "\n");
+        fprintf(log, "  w%d %d %d 0x%02X %d %d %d %d %08X\n",
+                cur, cx, cy, comp, b[0], b[1], b[2], b[3], fp);
+    }
+}
+
+/* FF4_REPORT_CELL batch: "<world> x,y x,y ..." - report every cell,
+ * log to FF4_CELLFILE (default ff4_cell.txt), exit.  Returns 1 if the
+ * env var was present and the batch ran. */
+static int run_report_env(void)
+{
+    const char *spec = getenv("FF4_REPORT_CELL");
+    const char *file = getenv("FF4_CELLFILE");
+    char buf[4096], *tok;
+    FILE *log;
+
+    if (!spec || !*spec)
+        return 0;
+    snprintf(buf, sizeof buf, "%s", spec);
+    tok = strtok(buf, " \t");
+    if (!tok)
+        return 0;
+    if (load_world(atoi(tok)) != 0) {
+        fprintf(stderr, "[wtile] bad world '%s'\n", tok);
+        return 1;
+    }
+    log = fopen(file ? file : "ff4_cell.txt", "w");
+    while ((tok = strtok(NULL, " \t,")) != NULL) {
+        int cx = atoi(tok);
+        int cy;
+
+        tok = strtok(NULL, " \t,");
+        if (!tok)
+            break;
+        cy = atoi(tok);
+        if (cx < 0 || cy < 0 || cx >= W->cells || cy >= W->cells) {
+            printf("[wtile] cell=(%d,%d) out of range\n", cx, cy);
+            continue;
+        }
+        report_world_cell(log, cx, cy);
+    }
+    if (log)
+        fclose(log);
+    printf("[wtile] batch report written to %s\n",
+           file ? file : "ff4_cell.txt");
+    return 1;
+}
+
+/* B key: bulk-report one representative cell per distinct composed
+ * tile on the map. */
+static void report_distinct_cells(FILE *log)
+{
+    uint8_t seen[256];
+    int x, y;
+
+    memset(seen, 0, sizeof seen);
+    for (y = 0; y < W->cells; ++y)
+        for (x = 0; x < W->cells; ++x) {
+            int comp = W->tiles[(size_t)y * W->cells + x];
+
+            if (seen[comp])
+                continue;
+            seen[comp] = 1;
+            report_world_cell(log, x, y);
+        }
+}
+
+/* --------------------------- shots -------------------------------- */
+
+static void save_shot(SDL_Renderer *r)
+{
+    const char *out = getenv("FF4_SHOT");
+    SDL_Surface *sf;
+    uint32_t *px = NULL;
+    int pitch;
+
+    if (!out)
+        return;
+    sf = SDL_CreateRGBSurfaceWithFormat(0, win_w, win_h, 32,
+                                        SDL_PIXELFORMAT_ABGR8888);
+    if (!sf)
+        return;
+    /* ff4_png_write emits the buffer bytes as PNG RGBA, so read back in
+     * ABGR8888 - memory order R,G,B,A - or the channels swap */
+    SDL_RenderReadPixels(r, NULL, SDL_PIXELFORMAT_ABGR8888, sf->pixels,
+                         sf->pitch);
+    pitch = sf->pitch;
+    if (pitch == win_w * 4)
+        ff4_png_write(out, win_w, win_h, (const uint32_t *)sf->pixels);
+    else {
+        int y;
+
+        px = (uint32_t *)malloc((size_t)win_w * win_h * 4);
+        for (y = 0; y < win_h; ++y)
+            memcpy(px + (size_t)y * win_w,
+                   (uint8_t *)sf->pixels + (size_t)y * pitch, win_w * 4);
+        ff4_png_write(out, win_w, win_h, px);
+        free(px);
+    }
+    SDL_FreeSurface(sf);
+    printf("[shot] %s (%dx%d)\n", out, win_w, win_h);
+}
+
+/* ---------------------------- main -------------------------------- */
+
+int main(int argc, char **argv)
+{
+    const char *e;
+    int world_env = -1, shot_frame = -1, shot_taken = 0;
+    double zoom_env = 1.0;
+    int whole_map = 0, quit = 0;
+    SDL_Window *win = NULL;
+    uint32_t *vbuf = NULL;
+    SDL_Texture *vtex = NULL;
+    FILE *blog = NULL;
+
+    (void)argc; (void)argv;
+
+    if ((e = getenv("FF4_NOCLIP")) && atoi(e))
+        noclip = 1;
+    if ((e = getenv("FF4_WORLD")))
+        world_env = atoi(e);
+    if ((e = getenv("FF4_ZOOM")))
+        zoom_env = atof(e);
+    if ((e = getenv("FF4_MAPX")))
+        ax = atoi(e) * 16 + 8;
+    if ((e = getenv("FF4_MAPY")))
+        ay = atoi(e) * 16 + 8;
+    if ((e = getenv("FF4_LAVASTEP")) && *e)
+        lava_step_env = atoi(e);
+    if ((e = getenv("FF4_SHOT"))) {
+        const char *d = getenv("FF4_SHOT_DELAY");
+
+        shot_frame = d ? atoi(d) : 0;
+    }
+
+    /* the batch reporter runs headless and exits */
+    if (run_report_env())
+        return 0;
+
+    /* sub-maps return in recovery stage 2 */
+    if (getenv("FF4_WARPTO"))
+        fprintf(stderr, "[stage1] sub-maps return in recovery stage 2 "
+                        "(world view only for now)\n");
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+        return 1;
+    }
+    if (SDL_CreateWindowAndRenderer(WIN_DEFAULT_W, WIN_DEFAULT_H,
+                                    SDL_WINDOW_RESIZABLE, &win, &ren) != 0) {
+        fprintf(stderr, "SDL window: %s\n", SDL_GetError());
+        return 1;
+    }
+    SDL_GetWindowSize(win, &win_w, &win_h);
+
+    if (load_world(world_env >= 0 ? world_env : 0) != 0) {
+        fprintf(stderr, "[world] load failed\n");
+        return 1;
+    }
+    load_sprite_slots();
+    sprite_load(sm_slot_sheet[0], sm_slot_pal[0]);
+    printf("[world] %s: %dx%d px (%dx%d cells), pack %s\n",
+           W->name, W->idx_w, W->idx_h, W->cells, W->cells,
+           wp_loaded ? "loaded" : "off");
+
+    vw = 256; vh = 224;                    /* SNES logical viewport */
+    zoom = zoom_env;
+    vbuf = (uint32_t *)malloc((size_t)vw * vh * 4);
+    update_camera();
+
+    while (!quit) {
+        SDL_Event ev;
+        const Uint8 *keys;
+        double dx = 0, dy = 0;
+
+        while (SDL_PollEvent(&ev)) {
+            if (ev.type == SDL_QUIT)
+                quit = 1;
+            else if (ev.type == SDL_WINDOWEVENT &&
+                     ev.window.event == SDL_WINDOWEVENT_RESIZED) {
+                win_w = ev.window.data1;
+                win_h = ev.window.data2;
+            } else if (ev.type == SDL_KEYDOWN) {
+                SDL_Keycode k = ev.key.keysym.sym;
+
+                if (k == SDLK_ESCAPE || k == SDLK_q)
+                    quit = 1;
+                else if (k == SDLK_t)
+                    whole_map = !whole_map;
+                else if (k == SDLK_v) {
+                    tile_report = !tile_report;
+                    if (tile_report) {
+                        cur_cx = (int)ax / 16;
+                        cur_cy = (int)ay / 16;
+                        printf("[wtile] report mode ON, cursor at "
+                               "(%d,%d)\n", cur_cx, cur_cy);
+                    } else
+                        printf("[wtile] report mode OFF\n");
+                } else if (k == SDLK_b && W->tiles) {
+                    blog = fopen(getenv("FF4_CELLFILE")
+                                 ? getenv("FF4_CELLFILE") : "ff4_cell.txt",
+                                 "a");
+                    report_distinct_cells(blog);
+                    if (blog) { fclose(blog); blog = NULL; }
+                } else if (k == SDLK_1 || k == SDLK_2 || k == SDLK_3) {
+                    if (load_world(k - SDLK_1) == 0) {
+                        sprite_load(sm_slot_sheet[0], sm_slot_pal[0]);
+                        update_camera();
+                    }
+                } else if (k == SDLK_r) {
+                    ax = 15 * 16 + 8; ay = 16 * 16 + 8;
+                    update_camera();
+                } else if (k == SDLK_KP_PLUS || k == SDLK_EQUALS) {
+                    if (zoom < 8) zoom += zoom >= 1 ? 1 : 0.25;
+                } else if (k == SDLK_KP_MINUS || k == SDLK_MINUS) {
+                    if (zoom > 0.25) zoom -= zoom >= 1.25 ? 1 : 0.25;
+                }
+            }
+        }
+
+        keys = SDL_GetKeyboardState(NULL);
+        if (tile_report) {
+            /* the cursor takes the arrows */
+            if (keys[SDL_SCANCODE_LEFT])  --cur_cx;
+            if (keys[SDL_SCANCODE_RIGHT]) ++cur_cx;
+            if (keys[SDL_SCANCODE_UP])    --cur_cy;
+            if (keys[SDL_SCANCODE_DOWN])  ++cur_cy;
+            if (cur_cx < 0) cur_cx = 0;
+            if (cur_cy < 0) cur_cy = 0;
+            if (cur_cx >= W->cells) cur_cx = W->cells - 1;
+            if (cur_cy >= W->cells) cur_cy = W->cells - 1;
+        } else {
+            if (keys[SDL_SCANCODE_LEFT])  { dx = -1; facing = 3; }
+            if (keys[SDL_SCANCODE_RIGHT]) { dx = 1;  facing = 1; }
+            if (keys[SDL_SCANCODE_UP])   { dy = -1; facing = 0; }
+            if (keys[SDL_SCANCODE_DOWN]) { dy = 1;  facing = 2; }
+            moving = (dx || dy) ? 1 : 0;
+            if (moving) {
+                int nx = (int)(ax + dx), ny = (int)(ay + dy);
+                int cellx = (nx + (dx > 0 ? 7 : dx < 0 ? -8 : 0)) / 16;
+                int celly = (ny + (dy > 0 ? 7 : dy < 0 ? -8 : 0)) / 16;
+
+                if (world_passable(cellx, (int)ay / 16) &&
+                    world_passable((int)ax / 16, celly) &&
+                    world_passable(cellx, celly)) {
+                    ax += dx; ay += dy;
+                    ++move_phase;
+                }
+            }
+            ++party_frame;            /* $7b free-run */
+        }
+
+        /* lava cadence: one LavaPalTbl step every 16 frames */
+        if (W->lavapal) {
+            int step = lava_step_env >= 0
+                         ? lava_step_env
+                         : (party_frame >> 4) & 7;
+
+            world_patch_palette(W, step);
+            lava_sync_pack(W);
+        }
+
+        update_camera();
+
+        /* ---- draw ---- */
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 0xFF);
+        SDL_RenderClear(ren);
+
+        if (whole_map) {
+            draw_whole_map(ren);
+        } else {
+            if (wp_loaded)
+                wp_pass(vbuf, vw, vh);
+            else
+                compose_view(W, (int)cam_x, (int)cam_y, vbuf, vw, vh);
+
+            if (!vtex)
+                vtex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_STREAMING,
+                                         vw, vh);
+            SDL_UpdateTexture(vtex, NULL, vbuf, vw * 4);
+            {
+                int dw = (int)(vw * zoom), dh = (int)(vh * zoom);
+
+                SDL_RenderCopy(ren, vtex, NULL,
+                               &(SDL_Rect){ (win_w - dw) / 2,
+                                            (win_h - dh) / 2, dw, dh });
+            }
+            /* the actor, centred on its world position */
+            if (!getenv("FF4_NOACTOR")) {
+                int sx = (int)(ax - cam_x) - 8;
+                int sy = (int)(ay - cam_y) - 8;
+                int ox = (win_w - (int)(vw * zoom)) / 2;
+                int oy = (win_h - (int)(vh * zoom)) / 2;
+
+                draw_actor(ren, ox + (int)(sx * zoom), oy + (int)(sy * zoom),
+                           zoom);
+            }
+            if (tile_report) {
+                /* the yellow report cursor */
+                int ox = (win_w - (int)(vw * zoom)) / 2;
+                int oy = (win_h - (int)(vh * zoom)) / 2;
+                int x = ox + (int)((cur_cx * 16 - cam_x) * zoom);
+                int y = oy + (int)((cur_cy * 16 - cam_y) * zoom);
+                int s = (int)(16 * zoom);
+                SDL_Rect rc = { x, y, s, s };
+
+                SDL_SetRenderDrawColor(ren, 0xFF, 0xE0, 0x00, 0xFF);
+                SDL_RenderDrawRect(ren, &rc);
+            }
+        }
+        SDL_RenderPresent(ren);
+
+        ++frame_counter;
+        if (shot_frame >= 0 && !shot_taken &&
+            (int)frame_counter > shot_frame) {
+            save_shot(ren);
+            shot_taken = 1;
+            quit = 1;              /* the shot harness is bounded */
+        }
+        SDL_Delay(16);            /* ~60 fps */
+    }
+
+    free(vbuf);
+    if (vtex) SDL_DestroyTexture(vtex);
+    free(spr_sheet);
+    wp_free();
+    SDL_Quit();
+    return 0;
+}
