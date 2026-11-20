@@ -14,14 +14,21 @@ rebuilt in stages, each landing only with its guards green.
   Conventions re-proven during the rebuild: `mapSpriteGraphics[n].bin` are
   already 8bpp-expanded (64 B/tile, logical order); world `.idx` is
   assign-shifted (a pixel maps directly); `ff4_png_write` wants ABGR readback.
-- **Stage 2 (next):** `submap_load`, atlas builder + pack draw passes,
-  warps/triggers, NPC/actor sprites → targets `submap_view`, `layout_group`,
-  `warp_audit`, `field_animation`.
+- **Stage 2 DONE (commit 18fcd25):** sub-maps render from the packs (two
+  layers per phase, base -> sprites -> front), content box + camera rules,
+  $1701 groups via `data/world/entryworld.bin`, tile animation cadence,
+  triggers/curtain/exit tiles, `FF4_AUTOWALK` traversal.  Guards green:
+  `submap_view` (8/8 exact), `layout_group`, `field_animation`; quick suite
+  13/15.
+- **Stage 3 (next):** message box (window text on the view), bridge z
+  (byte2 0x04 hide + 0x08 OAM-priority split, lane rules), exact NPC tile
+  tables (sprite sweep).  Targets: the full 16-guard suite green + the full
+  sprite sweep 0-mismatch, exactly as before the incident.
 - **Stage 3:** dialog/message box, bridge z, NPC cadence → the full 16-guard
   suite green exactly as before the incident.
 
-The quick suite currently reports 10/15 PASS; the five failures are all
-sub-map guards awaiting stages 2-3.
+The quick suite currently reports 13/15 PASS; `message_box` and `bridge_z`
+await stage 3 (plus the full sprite sweep).
 
 ---
 
