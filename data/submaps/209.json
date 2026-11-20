@@ -1,0 +1,1 @@
+{"id": 209, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 141, "switch1": 141, "x": 4, "randomMovement": true, "y": 9, "speed": 3, "animated": true, "reaction": 1, "palette": 1, "direction": 2}, "palette": 4, "name": "Chocobo's Forest", "layout1": 207, "layout2": 34, "has_bg2": true, "overhang_cells": 14, "hide_z_cells": 682, "hide_bottom_cells": 39}

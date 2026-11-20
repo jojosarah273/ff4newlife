@@ -1,0 +1,1 @@
+{"id": 3, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 224, "switch1": 224, "x": 16, "randomMovement": false, "y": 21, "speed": 2, "animated": true, "reaction": 1, "palette": 1, "direction": 2}, "palette": 4, "name": "Mysidia", "layout1": 3, "layout2": 34, "has_bg2": true, "overhang_cells": 30, "hide_z_cells": 655, "hide_bottom_cells": 84}

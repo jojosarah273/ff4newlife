@@ -1,0 +1,10 @@
+21 13 0 13 6 0 2 1	\char04:He must be a Karate  Fighter of Fabul!
+21 10 2 14 34 0 2 1	\char04:That one will not  be easy! \char02:Let's help!
+20 11 2 14 34 0 2 1	Karate man:Thank you.  I am \char06, the Karate  Master of Fabul. \line We were training when  they attacked us. \char00:We're on our way  to Fabul. \char05:\char12 is using  Baron to get crystals…
+22 11 2 14 34 0 2 1	Karate Man:ACHOOOO!
+19 13 1 14 34 0 2 1	\char00:What's that?
+23 13 3 14 34 0 2 1	\char05:\char12 must have  sent those monsters.
+21 9 2 13 33 0 2 1	\char06:To keep us busy  here and attack Fabul!? \char00:Then they will be  attacking any minute!
+21 14 0 14 2 0 2 1	\char06:But you are a Dark  Knight! \char00:It's not only your  problem, but also ours. \char04:I am the Prince of  Damcyan. \char00:\char05 and I were  in Baron.  And she is \char02.  I was fooled by King of  Baron and I had to defeat  her mother. \char02:……
+21 14 0 14 4 0 2 1	\char06:You have your own  reasons, I see.  Would you help me then? \char00:Of course! \char06:Fabul is to the  east over the mountain.  Let us go!
+21 14 0 14 5 0 2 1	Karate Man \char06 joined!\wait[0x28]

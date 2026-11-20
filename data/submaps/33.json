@@ -1,0 +1,1 @@
+{"id": 33, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 205, "switch1": 205, "x": 17, "randomMovement": true, "y": 19, "speed": 3, "animated": true, "reaction": 1, "palette": 3, "direction": 3}, "palette": 4, "name": "Chocobo's Village", "layout1": 33, "layout2": 34, "has_bg2": true, "overhang_cells": 18, "hide_z_cells": 552, "hide_bottom_cells": 134}

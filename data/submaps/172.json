@@ -1,0 +1,1 @@
+{"id": 172, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 201, "switch1": 201, "x": 21, "randomMovement": false, "y": 8, "speed": 3, "animated": true, "reaction": 0, "palette": 0, "direction": 2}, "palette": 10, "name": "B5F", "layout1": 172, "layout2": 155, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 717, "hide_bottom_cells": 0}

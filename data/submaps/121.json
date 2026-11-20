@@ -1,0 +1,1 @@
+{"id": 121, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 145, "switch1": 145, "x": 15, "randomMovement": false, "y": 22, "speed": 3, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 16, "name": "Antlion's Nest", "layout1": 121, "layout2": 35, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 545, "hide_bottom_cells": 0}

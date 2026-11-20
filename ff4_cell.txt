@@ -1,0 +1,14 @@
+[cell] map 1 at (9,10)
+  cur   ( 9,10) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  up ( 9, 9) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (10,10) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down ( 9,11) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+  left ( 8,10) tile= 25 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 2 at (15,30)
+  cur   (15,30) tile= 54 byte1=0x01 byte2=0x00  pass=yes
+  up (15,29) tile=116 byte1=0x03 byte2=0x04  pass=yes
+  right (16,30) tile= 54 byte1=0x01 byte2=0x00  pass=yes
+  down (15,31) tile=117 byte1=0x03 byte2=0x80  pass=yes
+  left (14,30) tile= 54 byte1=0x01 byte2=0x00  pass=yes
+

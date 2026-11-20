@@ -1,0 +1,1 @@
+{"id": 233, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 170, "switch1": 170, "x": 4, "randomMovement": false, "y": 3, "speed": 0, "animated": true, "reaction": 1, "palette": 3, "direction": 2}, "palette": 5, "name": "Weapon Shop", "layout1": 8, "layout2": 35, "has_bg2": true, "overhang_cells": 12, "hide_z_cells": 995, "hide_bottom_cells": 0}

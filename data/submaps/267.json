@@ -1,0 +1,1 @@
+{"id": 267, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 17, "switch1": 17, "x": 4, "randomMovement": false, "y": 15, "speed": 2, "animated": false, "reaction": 1, "palette": 0, "direction": 1}, "palette": 23, "name": "B2F", "layout1": 11, "layout2": 52, "has_bg2": true, "overhang_cells": 24, "hide_z_cells": 881, "hide_bottom_cells": 0}

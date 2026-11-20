@@ -1,0 +1,1 @@
+{"id": 151, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 1, "switch1": 1, "x": 4, "randomMovement": false, "y": 9, "speed": 0, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 6, "name": "Serpent Road", "layout1": 151, "layout2": 35, "has_bg2": true, "overhang_cells": 20, "hide_z_cells": 973, "hide_bottom_cells": 0}

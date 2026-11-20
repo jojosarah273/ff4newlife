@@ -1,0 +1,1 @@
+{"id": 245, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 62, "switch1": 62, "x": 6, "randomMovement": false, "y": 6, "speed": 3, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 6, "name": "Room", "layout1": 176, "layout2": 35, "has_bg2": true, "overhang_cells": 8, "hide_z_cells": 1003, "hide_bottom_cells": 0}

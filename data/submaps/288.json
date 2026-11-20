@@ -1,0 +1,1 @@
+{"id": 288, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 68, "switch1": 68, "x": 10, "randomMovement": false, "y": 9, "speed": 0, "animated": true, "reaction": 1, "palette": 0, "direction": 2}, "palette": 23, "name": "Cafe HOWDY!", "layout1": 32, "layout2": 52, "has_bg2": true, "overhang_cells": 25, "hide_z_cells": 848, "hide_bottom_cells": 0}

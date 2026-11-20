@@ -1,0 +1,1 @@
+{"id": 269, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 36, "switch1": 36, "x": 18, "randomMovement": false, "y": 2, "speed": 2, "animated": true, "reaction": 0, "palette": 0, "direction": 0}, "palette": 7, "name": "Crystal Room", "layout1": 13, "layout2": 12, "has_bg2": true, "overhang_cells": 52, "hide_z_cells": 937, "hide_bottom_cells": 0}

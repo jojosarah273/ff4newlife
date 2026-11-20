@@ -1,0 +1,45 @@
+# World-map animated tiles (band 0x80..0x9f + foam 0xac/0xad)
+# Collected with the in-game V/B tile reporter (ff4_cell.txt ->
+# data/world/tile_report_raw.txt); summarise with
+#   python3 tools/ff4_world_anim_report.py
+#
+# The band is the SAME in every world; what it means changes:
+#   world 0 overworld : water + white foam
+#   world 1 underground: lava
+#   world 2 moon      : no seas (no reports)
+
+band 0x80-0x9f
+foam 0xac 0xad
+
+# --- world 0 (overworld), 17 reported cells around (120..133, 122..129)
+ocean 0x08 0x09 0x0a 0x0b 0x0c 0x18 0x19 0x1c 0x2a
+coast 0x02 0x04 0x22 0x24 0x52 0x54
+ocean-tiles-seen 0x80 0x81 0x82 0x83 0x84 0x85 0x86 0x87 0x8a 0x8b 0x8c \
+                 0x8d 0x8e 0x94 0x95 0x96 0x97 0x9a 0x9b 0x9e 0xac 0xad
+
+# --- world 1 (underground), 7 reported cells around (119..126, 99..112)
+lava 0x00
+lava-edge 0x5f 0x65 0x75 0x76
+lava-tiles-seen 0x88 0x89 0x98 0x99 0x9a 0x9b 0x9c
+
+# Rendering note: in the underground the band's colours come from the palette
+# animation (UpdateLavaPal @c4cd), so the tiles look dull with the static
+# palette - do not try to identify lava by colour, use the report.
+
+# --- mechanism (field/field.asm), found after the reports
+# WaitFrame @914b calls, every frame:
+#   overworld  ($1700 == 0): UpdateWaterAnim @8fa1 + TfrWaterGfx @8e67
+#   underground($1700 == 1): UpdateLavaAnim  @8ee3 + TfrLavaGfx @8f34
+#                            + UpdateLavaPal @c4cd
+#   both: TfrBGAnimGfx, UpdateWhalePal, UpdateBabilPal
+#
+# UpdateWaterAnim is NOT a 4-phase graphics upload (that is the field maps,
+# VRAM $120..$12F).  It is a TILEMAP ROTATION: every frame it rotates an
+# 8-tile run of the world tilemap by one position, walking a 16-step cycle:
+#   WaterShiftX @90aa: 00 88 10 98 20 a8 30 b8 80 08 90 18 a0 28 b0 38
+#   WaterShiftY @909a: 00 41 02 43 04 45 06 47 40 01 42 03 44 05 46 07
+# horizontal pass uses ($7c >> 1) & 15 and is skipped on odd $7c;
+# vertical pass uses $7c & 15 every frame.  UpdateLavaAnim returns early on
+# odd $7c, so lava rotates every second frame.
+# Emulator agrees: ~15 tilemap entries change per frame while the wave runs,
+# and no cell changed more than once in 120 frames of the intro flyover.

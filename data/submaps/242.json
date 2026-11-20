@@ -1,0 +1,1 @@
+{"id": 242, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 253, "switch1": 253, "x": 6, "randomMovement": false, "y": 5, "speed": 2, "animated": true, "reaction": 1, "palette": 0, "direction": 2}, "palette": 21, "name": "Castle of Dwarves", "layout1": 7, "layout2": 28, "has_bg2": true, "overhang_cells": 33, "hide_z_cells": 172, "hide_bottom_cells": 5}

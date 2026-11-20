@@ -1,0 +1,1 @@
+{"id": 39, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 121, "switch1": 121, "x": 24, "randomMovement": true, "y": 26, "speed": 2, "animated": true, "reaction": 1, "palette": 3, "direction": 3}, "palette": 3, "name": "Toroian Castle", "layout1": 39, "layout2": 107, "has_bg2": true, "overhang_cells": 53, "hide_z_cells": 721, "hide_bottom_cells": 213}

@@ -1,0 +1,1 @@
+{"id": 298, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 41, "switch1": 41, "x": 16, "randomMovement": false, "y": 10, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 3}, "palette": 6, "name": "D", "layout1": 42, "layout2": 52, "has_bg2": true, "overhang_cells": 24, "hide_z_cells": 935, "hide_bottom_cells": 0}

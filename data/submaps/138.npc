@@ -1,0 +1,11 @@
+7 6 0 13 32 0 2 1	Hee-hee-hee… \line\line\lineI didn't expect you to defeat me…… But this does not mean anything to this Kainazzo… Why don't you accompany me to the Dark World! Hee-hah-hah!
+7 2 2 13 10 0 2 1	\char03:Walls!
+7 2 2 13 7 0 2 1	\char09:It's locked!\song[0x23] \char03:This one too!
+7 2 2 13 8 0 2 1	\char00:\char07! \char08!
+7 2 2 13 3 0 2 1	\char07:Thanks, dude! \char08:We loved to be  with all of you! \char00:What… \char07:You won't be stuck  in a place like this! \char08:Please look after  \char00, Master \char03!
+7 2 2 13 6 0 2 1	\char07:Ready, \char08? \char08:Yes!
+6 4 3 28 105 0 2 1	\char00:Wait!  …NO!! \line\line Doooon't!! \line\line\line\char07 and \char08:STONE!!
+8 4 1 28 106 0 2 1	\char00:\char07!……\char08!!\song[0x2A]\wait[0x28]
+22 4 3 28 105 0 2 1	No effect. They have become stone by their will.
+24 4 1 28 106 0 2 1	\char06:Oh, children…
+7 3 2 14 32 0 2 1	\char09:I'll avenge you! \line\line\line To the Enterprise!!

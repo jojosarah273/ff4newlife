@@ -1,0 +1,1 @@
+{"id": 116, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 103, "switch1": 103, "x": 16, "randomMovement": false, "y": 14, "speed": 2, "animated": true, "reaction": 0, "palette": 2, "direction": 2}, "palette": 14, "name": "Waterfalls", "layout1": 116, "layout2": 124, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 693, "hide_bottom_cells": 226}

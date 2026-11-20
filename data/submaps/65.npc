@@ -1,0 +1,12 @@
+13 7 2 13 100 0 3 1	\char03:That is \char13!  Ah-ah! \char13!
+13 11 0 13 3 0 2 1	\char03:You're the bard!  You did this to her! Bard:!?
+23 8 3 13 4 0 2 1	\char04:The SandRuby is  made from the Antlion  when it lays its eggs  in the cave.  The cave is in the east,  but we must go across  shallows to get there.  \line There is the Hovercraft  in Damcyan we can use.  We can also go to Kaipo  through the shallows!
+13 11 0 13 2 0 2 1	You can go to Kaipo along the shallows with the Hovercraft.
+11 5 2 15 94 0 0 1	The road to Fabul through Mt. Hobs is being blocked by a thick ice.
+15 6 2 15 94 0 0 1	\char03:Who is \char12? \line\line\line\char04:I heard that he's  gathering crystals using  Baron's Red Wings.  …sob  …sob \char03:Stop crying!  Your tears won't bring  back \char13.  Wait for me \char12!  I'm coming to avenge my  daughter!
+9 8 2 15 94 0 0 1	\char00:You can't go alone!
+18 9 2 15 94 0 0 1	\char03:I don't need any  help! This is my own  affair!
+3 13 2 13 101 0 0 1	\char03 left.
+23 13 2 13 101 0 0 1	\char04:Ah… \char13…  sob… sob…
+2 13 1 14 20 0 2 1	\char02:Crybaby!
+3 14 0 15 21 0 1 1	\char02:You are a man!  You are a grown-up!  You are not the only one  who has lost loved ones! \char00:\char02……

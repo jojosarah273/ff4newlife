@@ -1,0 +1,1 @@
+{"id": 284, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 134, "switch1": 134, "x": 23, "randomMovement": false, "y": 5, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 3, "name": "Left Tower", "layout1": 28, "layout2": 28, "has_bg2": true, "overhang_cells": 28, "hide_z_cells": 131, "hide_bottom_cells": 0}

@@ -1,0 +1,1 @@
+{"id": 231, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 194, "switch1": 194, "x": 5, "randomMovement": false, "y": 3, "speed": 1, "animated": true, "reaction": 0, "palette": 1, "direction": 2}, "palette": 5, "name": "Item Shop", "layout1": 10, "layout2": 35, "has_bg2": true, "overhang_cells": 16, "hide_z_cells": 990, "hide_bottom_cells": 0}

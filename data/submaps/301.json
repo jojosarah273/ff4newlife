@@ -1,0 +1,1 @@
+{"id": 301, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 27, "switch1": 27, "x": 2, "randomMovement": false, "y": 2, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 10, "name": "Super Cannon", "layout1": 45, "layout2": 48, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 1020, "hide_bottom_cells": 0}

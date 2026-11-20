@@ -1,0 +1,897 @@
+[cell] map 0 at (15,16)
+  cur   (15,16) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up (15,15) tile= 10 byte1=0x00 byte2=0x04  pass=NO
+  right (16,16) tile= 82 byte1=0x00 byte2=0x04  pass=NO
+  down (15,17) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (14,16) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (13,16)
+  cur   (13,16) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up (13,15) tile=  9 byte1=0x00 byte2=0x04  pass=NO
+  right (14,16) tile=112 byte1=0x11 byte2=0x80  pass=NO
+  down (13,17) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (12,16) tile= 80 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (21,20)
+  cur   (21,20) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  up (21,19) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right (22,20) tile= 82 byte1=0x00 byte2=0x04  pass=NO
+  down (21,21) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (20,20) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (15,24)
+  cur   (15,24) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  up (15,23) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right (16,24) tile= 82 byte1=0x00 byte2=0x04  pass=NO
+  down (15,25) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (14,24) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (15,23)
+  cur   (15,23) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  up (15,22) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+  right (16,23) tile= 74 byte1=0x00 byte2=0x04  pass=NO
+  down (15,24) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  left (14,23) tile= 73 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (21,26)
+  cur   (21,26) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up (21,25) tile= 73 byte1=0x00 byte2=0x04  pass=NO
+  right (22,26) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  down (21,27) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (20,26) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (22,26)
+  cur   (22,26) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  up (22,25) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right (23,26) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  down (22,27) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (21,26) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 0 at (23,26)
+  cur   (23,26) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  up (23,25) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right (24,26) tile= 82 byte1=0x00 byte2=0x04  pass=NO
+  down (23,27) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left (22,26) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 0 at (8,11)
+  cur   ( 8,11) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right ( 9,11) tile= 82 byte1=0x00 byte2=0x04  pass=NO
+  down ( 8,12) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 0 at (7,11)
+  cur   ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  right ( 8,11) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 7,12) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left ( 6,11) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (5,11)
+  cur   ( 5,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 5,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  right ( 6,11) tile=112 byte1=0x11 byte2=0x80  pass=NO
+  down ( 5,12) tile=  0 byte1=0x01 byte2=0x00  pass=NO
+  left ( 4,11) tile= 80 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (8,10)
+  cur   ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  up ( 8, 9) tile=109 byte1=0x03 byte2=0x04  pass=yes
+  right ( 9,10) tile= 74 byte1=0x00 byte2=0x04  pass=NO
+  down ( 8,11) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+
+[cell] map 0 at (7,10)
+  cur   ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  up ( 7, 9) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+  right ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  down ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 6,10) tile= 73 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (7,10)
+  cur   ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  up ( 7, 9) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+  right ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  down ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 6,10) tile= 73 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (7,10)
+  cur   ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  up ( 7, 9) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+  right ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  down ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 6,10) tile= 73 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (7,11)
+  cur   ( 7,11) tile= 75 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  right ( 8,11) tile= 76 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 7,12) tile=  4 byte1=0x01 byte2=0x00  pass=NO
+  left ( 6,11) tile=112 byte1=0x11 byte2=0x80  pass=NO
+
+[cell] map 0 at (7,9)
+  cur   ( 7, 9) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 7, 8) tile= 97 byte1=0x00 byte2=0x04  pass=NO
+  right ( 8, 9) tile=109 byte1=0x03 byte2=0x04  pass=yes
+  down ( 7,10) tile= 84 byte1=0x03 byte2=0x04  pass=yes
+  left ( 6, 9) tile= 98 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 0 at (8,9)
+  cur   ( 8, 9) tile=109 byte1=0x03 byte2=0x04  pass=yes
+  up ( 8, 8) tile= 65 byte1=0x00 byte2=0x04  pass=NO
+  right ( 9, 9) tile= 69 byte1=0x00 byte2=0x04  pass=NO
+  down ( 8,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  left ( 7, 9) tile= 99 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 0 at (5,9)
+  cur   ( 5, 9) tile=109 byte1=0x03 byte2=0x04  pass=yes
+  up ( 5, 8) tile= 65 byte1=0x00 byte2=0x04  pass=NO
+  right ( 6, 9) tile= 98 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 5,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  left ( 4, 9) tile= 68 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (5,9)
+  cur   ( 5, 9) tile=109 byte1=0x03 byte2=0x04  pass=yes
+  up ( 5, 8) tile= 65 byte1=0x00 byte2=0x04  pass=NO
+  right ( 6, 9) tile= 98 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 5,10) tile= 83 byte1=0x03 byte2=0x04  pass=yes
+  left ( 4, 9) tile= 68 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (18,13)
+  cur   (18,13) tile= 14 byte1=0x05 byte2=0x04  pass=NO
+  up (18,12) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (19,13) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (18,14) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left (17,13) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (18,12)
+  cur   (18,12) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (18,11) tile= 52 byte1=0x02 byte2=0x04  pass=NO
+  right (19,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  down (18,13) tile= 14 byte1=0x05 byte2=0x04  pass=NO
+  left (17,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (17,11)
+  cur   (17,11) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (17,10) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  right (18,11) tile= 52 byte1=0x02 byte2=0x04  pass=NO
+  down (17,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  left (16,11) tile= 52 byte1=0x02 byte2=0x04  pass=NO
+
+[cell] map 0 at (19,11)
+  cur   (19,11) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (19,10) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  right (20,11) tile= 52 byte1=0x02 byte2=0x04  pass=NO
+  down (19,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  left (18,11) tile= 52 byte1=0x02 byte2=0x04  pass=NO
+
+[cell] map 0 at (25,14)
+  cur   (25,14) tile= 13 byte1=0x05 byte2=0x04  pass=NO
+  up (25,13) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (26,14) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (25,15) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (24,14) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (28,11)
+  cur   (28,11) tile=116 byte1=0x03 byte2=0x04  pass=NO
+  up (28,10) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  right (29,11) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  down (28,12) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left (27,11) tile=104 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (28,10)
+  cur   (28,10) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  up (28, 9) tile=100 byte1=0x03 byte2=0x04  pass=NO
+  right (29,10) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  down (28,11) tile=116 byte1=0x03 byte2=0x04  pass=NO
+  left (27,10) tile=104 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (28,9)
+  cur   (28, 9) tile=100 byte1=0x03 byte2=0x04  pass=NO
+  up (28, 8) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (29, 9) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+  down (28,10) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  left (27, 9) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (19,6)
+  cur   (19, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (19, 5) tile= 37 byte1=0x02 byte2=0x08  pass=yes
+  right (20, 6) tile= 58 byte1=0x02 byte2=0x08  pass=yes
+  down (19, 7) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+  left (18, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (18,6)
+  cur   (18, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (18, 5) tile=  7 byte1=0x03 byte2=0x00  pass=yes
+  right (19, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (18, 7) tile=100 byte1=0x03 byte2=0x04  pass=NO
+  left (17, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (17,6)
+  cur   (17, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (17, 5) tile= 37 byte1=0x02 byte2=0x08  pass=yes
+  right (18, 6) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (17, 7) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+  left (16, 6) tile= 57 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (27,20)
+  cur   (27,20) tile= 14 byte1=0x05 byte2=0x04  pass=NO
+  up (27,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,20) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (26,20) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (27,22)
+  cur   (27,22) tile=100 byte1=0x03 byte2=0x04  pass=NO
+  up (27,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,22) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+  down (27,23) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  left (26,22) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (27,23)
+  cur   (27,23) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  up (27,22) tile=100 byte1=0x03 byte2=0x04  pass=NO
+  right (28,23) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  down (27,24) tile= 56 byte1=0x02 byte2=0x04  pass=NO
+  left (26,23) tile=104 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (27,24)
+  cur   (27,24) tile= 56 byte1=0x02 byte2=0x04  pass=NO
+  up (27,23) tile= 77 byte1=0x03 byte2=0x04  pass=NO
+  right (28,24) tile=104 byte1=0x00 byte2=0x04  pass=NO
+  down (27,25) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (26,24) tile=104 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (27,25)
+  cur   (27,25) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (27,24) tile= 56 byte1=0x02 byte2=0x04  pass=NO
+  right (28,25) tile= 38 byte1=0x02 byte2=0x08  pass=yes
+  down (27,26) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  left (26,25) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (27,26)
+  cur   (27,26) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  up (27,25) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (28,26) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (27,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (26,26) tile= 57 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (28,26)
+  cur   (28,26) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (28,25) tile= 38 byte1=0x02 byte2=0x08  pass=yes
+  right (29,26) tile= 37 byte1=0x02 byte2=0x08  pass=yes
+  down (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (27,26) tile=122 byte1=0x00 byte2=0x80  pass=NO
+
+[cell] map 0 at (28,27)
+  cur   (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (28,26) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (29,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (28,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (27,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (27,27)
+  cur   (27,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (27,26) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  right (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (27,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (26,27) tile= 57 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (29,27)
+  cur   (29,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (29,26) tile= 37 byte1=0x02 byte2=0x08  pass=yes
+  right (30,27) tile= 58 byte1=0x02 byte2=0x08  pass=yes
+  down (29,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (29,27)
+  cur   (29,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (29,26) tile= 37 byte1=0x02 byte2=0x08  pass=yes
+  right (30,27) tile= 58 byte1=0x02 byte2=0x08  pass=yes
+  down (29,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (29,28)
+  cur   (29,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (29,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (30,28) tile= 58 byte1=0x02 byte2=0x08  pass=yes
+  down (29,29) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  left (28,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (28,28)
+  cur   (28,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (28,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (29,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (28,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (27,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (27,28)
+  cur   (27,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (27,27) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (28,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (27,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  left (26,28) tile= 57 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (27,29)
+  cur   (27,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (27,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (28,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  down (27,30) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left (26,29) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (28,29)
+  cur   (28,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  up (28,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (29,29) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  down (28,30) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  left (27,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (29,29)
+  cur   (29,29) tile=122 byte1=0x00 byte2=0x80  pass=NO
+  up (29,28) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+  right (30,29) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  down (29,30) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  left (28,29) tile= 50 byte1=0x02 byte2=0x08  pass=NO
+
+[cell] map 0 at (27,21)
+  cur   (27,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,20) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  right (28,21) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,22) tile=100 byte1=0x03 byte2=0x04  pass=yes
+  left (26,21) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (27,19)
+  cur   (27,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,19) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,20) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  left (26,19) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (27,18)
+  cur   (27,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,18) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (26,18) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (27,17)
+  cur   (27,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,16) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (26,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (27,16)
+  cur   (27,16) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (28,16) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (26,16) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (27,15)
+  cur   (27,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (27,14) tile= 38 byte1=0x02 byte2=0x08  pass=yes
+  right (28,15) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27,16) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (26,15) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (16,18)
+  cur   (16,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (16,17) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  right (17,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  down (16,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  left (15,18) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (16,19)
+  cur   (16,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (16,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  right (17,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  down (16,20) tile= 76 byte1=0x02 byte2=0x0C  pass=NO
+  left (15,19) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (17,19)
+  cur   (17,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (17,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  right (18,19) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (17,20) tile= 75 byte1=0x02 byte2=0x0C  pass=NO
+  left (16,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 1 at (17,18)
+  cur   (17,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (17,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (18,18) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (17,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  left (16,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 1 at (10,11)
+  cur   (10,11) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (10,10) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (11,11) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (10,12) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 9,11) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (10,12)
+  cur   (10,12) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (10,11) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  right (11,12) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (10,13) tile= 76 byte1=0x02 byte2=0x0C  pass=NO
+  left ( 9,12) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (10,18)
+  cur   (10,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (10,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (11,18) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (10,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 9,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 1 at (9,18)
+  cur   ( 9,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 9,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (10,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 9,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  left ( 8,18) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (9,19)
+  cur   ( 9,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up ( 9,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  right (10,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  down ( 9,20) tile= 76 byte1=0x02 byte2=0x0C  pass=NO
+  left ( 8,19) tile= 16 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 1 at (10,19)
+  cur   (10,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  up (10,18) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+  right (11,19) tile= 18 byte1=0x00 byte2=0x04  pass=NO
+  down (10,20) tile= 76 byte1=0x02 byte2=0x0C  pass=NO
+  left ( 9,19) tile= 17 byte1=0x02 byte2=0x0C  pass=yes
+
+[cell] map 2 at (8,20)
+  cur   ( 8,20) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up ( 8,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right ( 9,20) tile= 13 byte1=0x05 byte2=0x04  pass=yes
+  down ( 8,21) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left ( 7,20) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (7,20)
+  cur   ( 7,20) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up ( 7,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right ( 8,20) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down ( 7,21) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left ( 6,20) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (6,20)
+  cur   ( 6,20) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right ( 7,20) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down ( 6,21) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left ( 5,20) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (6,19)
+  cur   ( 6,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right ( 7,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down ( 6,20) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left ( 5,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (6,18)
+  cur   ( 6,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right ( 7,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down ( 6,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left ( 5,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (6,18)
+  cur   ( 6,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right ( 7,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down ( 6,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left ( 5,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (6,17)
+  cur   ( 6,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,16) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right ( 7,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down ( 6,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left ( 5,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (6,16)
+  cur   ( 6,16) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  up ( 6,15) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right ( 7,16) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down ( 6,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left ( 5,16) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (7,16)
+  cur   ( 7,16) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up ( 7,15) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right ( 8,16) tile= 68 byte1=0x00 byte2=0x04  pass=NO
+  down ( 7,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left ( 6,16) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (13,22)
+  cur   (13,22) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (13,21) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (14,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (13,23) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left (12,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (13,23)
+  cur   (13,23) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  up (13,22) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (14,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (13,24) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (12,23) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (14,23)
+  cur   (14,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (14,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (15,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (14,24) tile= 59 byte1=0x00 byte2=0x04  pass=NO
+  left (13,23) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (15,23)
+  cur   (15,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (15,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (16,23) tile= 13 byte1=0x05 byte2=0x04  pass=yes
+  down (15,24) tile= 59 byte1=0x00 byte2=0x04  pass=NO
+  left (14,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (17,23)
+  cur   (17,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (17,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (18,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (17,24) tile= 59 byte1=0x00 byte2=0x04  pass=NO
+  left (16,23) tile= 13 byte1=0x05 byte2=0x04  pass=yes
+
+[cell] map 2 at (18,23)
+  cur   (18,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (18,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (19,23) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  down (18,24) tile= 59 byte1=0x00 byte2=0x04  pass=NO
+  left (17,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (19,23)
+  cur   (19,23) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  up (19,22) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (20,23) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,24) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (18,23) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (19,22)
+  cur   (19,22) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (19,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (20,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,23) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  left (18,22) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (19,21)
+  cur   (19,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (19,20) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (20,21) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,22) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (18,21) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (19,20)
+  cur   (19,20) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (19,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (20,20) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,21) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (18,20) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (19,19)
+  cur   (19,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (19,18) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right (20,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,20) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (18,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (19,19)
+  cur   (19,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (19,18) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right (20,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (19,20) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (18,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (19,18)
+  cur   (19,18) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  up (19,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (20,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (19,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (18,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (20,18)
+  cur   (20,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (20,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (21,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  down (20,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (19,18) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (21,18)
+  cur   (21,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+  up (21,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  right (22,18) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  down (21,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (20,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (22,18)
+  cur   (22,18) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  up (22,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (23,18) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (22,19) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  left (21,18) tile= 49 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (22,17)
+  cur   (22,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (22,16) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  right (23,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (22,18) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  left (21,17) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (22,16)
+  cur   (22,16) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  up (22,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (23,16) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (22,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (21,16) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (22,15)
+  cur   (22,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (22,14) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (23,15) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (22,16) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  left (21,15) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (22,14)
+  cur   (22,14) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (22,13) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right (23,14) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (22,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (21,14) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 2 at (22,13)
+  cur   (22,13) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  up (22,12) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+  right (23,13) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  down (22,14) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (21,13) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 2 at (23,13)
+  cur   (23,13) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  up (23,12) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (24,13) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (23,14) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left (22,13) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 2 at (23,12)
+  cur   (23,12) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (23,11) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (24,12) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (23,13) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  left (22,12) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 2 at (22,16)
+  cur   (22,16) tile= 14 byte1=0x05 byte2=0x04  pass=yes
+  up (22,15) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  right (23,16) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (22,17) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (21,16) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 30 at (9,6)
+  cur   ( 9, 6) tile= 19 byte1=0x01 byte2=0x00  pass=yes
+  up ( 9, 5) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  right (10, 6) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  down ( 9, 7) tile= 20 byte1=0x00 byte2=0x20  pass=NO
+  left ( 8, 6) tile=  9 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 30 at (9,6)
+  cur   ( 9, 6) tile= 19 byte1=0x01 byte2=0x00  pass=yes
+  up ( 9, 5) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  right (10, 6) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  down ( 9, 7) tile= 20 byte1=0x00 byte2=0x20  pass=NO
+  left ( 8, 6) tile=  9 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 30 at (5,6)
+  cur   ( 5, 6) tile= 19 byte1=0x01 byte2=0x00  pass=yes
+  up ( 5, 5) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  right ( 6, 6) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+  down ( 5, 7) tile= 20 byte1=0x00 byte2=0x20  pass=NO
+  left ( 4, 6) tile= 65 byte1=0x00 byte2=0x04  pass=NO
+
+[cell] map 0 at (11,27)
+  cur   (11,27) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  up (11,26) tile=  6 byte1=0x01 byte2=0x00  pass=yes
+  right (12,27) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+  down (11,28) tile= 86 byte1=0x00 byte2=0x04  pass=NO
+  left (10,27) tile=  4 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 1 at (8,16)
+  cur   ( 8,16) tile=124 byte1=0x03 byte2=0x80  pass=yes
+  up ( 8,15) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right ( 9,16) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down ( 8,17) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left ( 7,16) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 1 at (14,9)
+  cur   (14, 9) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  up (14, 8) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (15, 9) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (14,10) tile= 60 byte1=0x00 byte2=0x04  pass=NO
+  left (13, 9) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (22,12)
+  cur   (22,12) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+  up (22,11) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  right (23,12) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  down (22,13) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  left (21,12) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (27,7)
+  cur   (27, 7) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  up (27, 6) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  right (28, 7) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  down (27, 8) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left (26, 7) tile=  1 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 0 at (17,12)
+  cur   (17,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  up (17,11) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (18,12) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  down (17,13) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left (16,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 0 at (17,12)
+  cur   (17,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+  up (17,11) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (18,12) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  down (17,13) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+  left (16,12) tile= 45 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 1 at (17,7)
+  cur   (17, 7) tile= 57 byte1=0x02 byte2=0x08  pass=yes
+  up (17, 6) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right (18, 7) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  down (17, 8) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left (16, 7) tile=  0 byte1=0x01 byte2=0x00  pass=yes
+
+[cell] map 2 at (18,10)
+  cur   (18,10) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  up (18, 9) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (19,10) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  down (18,11) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+  left (17,10) tile= 44 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 6 at (11,8)
+  cur   (11, 8) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  up (11, 7) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+  right (12, 8) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  down (11, 9) tile= 46 byte1=0x02 byte2=0x08  pass=yes
+  left (10, 8) tile= 50 byte1=0x02 byte2=0x08  pass=yes
+
+[cell] map 6 at (13,18)
+  cur   (13,18) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  up (13,17) tile= 36 byte1=0x02 byte2=0x08  pass=yes
+  right (14,18) tile=  3 byte1=0x00 byte2=0x04  pass=NO
+  down (13,19) tile= 48 byte1=0x02 byte2=0x08  pass=yes
+  left (12,18) tile=107 byte1=0x00 byte2=0x04  pass=NO
+
+
+[wtile] world=0 (Overworld) at (128,129) composed=25 (0x19)
+  base=128(0x80W),129(0x81W),130(0x82W),131(0x83W) water=4/4 fp=0676DA49
+  neighbours: 25 25 25 25 25 25 25 25
+  w0 128 129 0x19 128 129 130 131 0676DA49
+
+[wtile] world=0 (Overworld) at (128,129) composed=25 (0x19)
+  base=128(0x80W),129(0x81W),130(0x82W),131(0x83W) water=4/4 fp=0676DA49
+  neighbours: 25 25 25 25 25 25 25 25
+  w0 128 129 0x19 128 129 130 131 0676DA49
+
+[wtile] world=0 (Overworld) at (120,122) composed=34 (0x22)
+  base=66(0x42),67(0x43),173(0xADW),83(0x53) water=1/4 fp=7E705DC7
+  neighbours: 19 4 19 34 10 8 36 19
+  w0 120 122 0x22 66 67 173 83 7E705DC7
+
+[wtile] world=0 (Overworld) at (125,122) composed=4 (0x04)
+  base=6(0x06),173(0xADW),22(0x16),23(0x17) water=1/4 fp=A5D8DC2B
+  neighbours: 83 33 82 4 19 19 3 83
+  w0 125 122 0x04 6 173 22 23 A5D8DC2B
+
+[wtile] world=0 (Overworld) at (126,122) composed=82 (0x52)
+  base=210(0xD2),194(0xC2),173(0xADW),210(0xD2) water=1/4 fp=04DB391C
+  neighbours: 33 67 33 82 4 19 4 83
+  w0 126 122 0x52 210 194 173 210 04DB391C
+
+[wtile] world=0 (Overworld) at (120,123) composed=10 (0x0A)
+  base=134(0x86W),173(0xADW),150(0x96W),151(0x97W) water=4/4 fp=2D412B53
+  neighbours: 34 19 34 10 12 11 8 36
+  w0 120 123 0x0A 134 173 150 151 2D412B53
+
+[wtile] world=0 (Overworld) at (132,123) composed=84 (0x54)
+  base=195(0xC3),211(0xD3),211(0xD3),172(0xACW) water=1/4 fp=9CDCBD6D
+  neighbours: 49 83 2 19 3 3 83 67
+  w0 132 123 0x54 195 211 211 172 9CDCBD6D
+
+[wtile] world=0 (Overworld) at (133,123) composed=2 (0x02)
+  base=172(0xACW),3(0x03),18(0x12),19(0x13) water=1/4 fp=1C4F021A
+  neighbours: 83 83 4 19 19 3 84 49
+  w0 133 123 0x02 172 3 18 19 1C4F021A
+
+[wtile] world=0 (Overworld) at (120,124) composed=12 (0x0C)
+  base=128(0x80W),135(0x87W),130(0x82W),131(0x83W) water=4/4 fp=A0E943C7
+  neighbours: 10 34 10 12 25 25 11 8
+  w0 120 124 0x0C 128 135 130 131 A0E943C7
+
+[wtile] world=0 (Overworld) at (120,125) composed=25 (0x19)
+  base=128(0x80W),129(0x81W),130(0x82W),131(0x83W) water=4/4 fp=0676DA49
+  neighbours: 12 10 12 28 25 25 25 11
+  w0 120 125 0x19 128 129 130 131 0676DA49
+
+[wtile] world=0 (Overworld) at (121,126) composed=28 (0x1C)
+  base=128(0x80W),129(0x81W),130(0x82W),155(0x9BW) water=4/4 fp=4EAB5CEE
+  neighbours: 12 10 42 10 12 25 25 25
+  w0 121 126 0x1C 128 129 130 155 4EAB5CEE
+
+[wtile] world=0 (Overworld) at (122,126) composed=42 (0x2A)
+  base=138(0x8AW),139(0x8BW),154(0x9AW),172(0xACW) water=4/4 fp=C92B578C
+  neighbours: 10 34 2 34 10 12 28 12
+  w0 122 126 0x2A 138 139 154 172 C92B578C
+
+[wtile] world=0 (Overworld) at (126,126) composed=8 (0x08)
+  base=172(0xACW),133(0x85W),148(0x94W),149(0x95W) water=4/4 fp=7C4BD89B
+  neighbours: 35 35 10 12 24 36 20 19
+  w0 126 126 0x08 172 133 148 149 7C4BD89B
+
+[wtile] world=0 (Overworld) at (125,127) composed=36 (0x24)
+  base=70(0x46),71(0x47),86(0x56),172(0xACW) water=1/4 fp=490468E0
+  neighbours: 20 8 24 11 9 9 35 19
+  w0 125 127 0x24 70 71 86 172 490468E0
+
+[wtile] world=0 (Overworld) at (126,127) composed=24 (0x18)
+  base=142(0x8EW),129(0x81W),158(0x9EW),131(0x83W) water=4/4 fp=0F95A0BA
+  neighbours: 8 10 12 25 11 9 36 20
+  w0 126 127 0x18 142 129 158 131 0F95A0BA
+
+[wtile] world=0 (Overworld) at (128,127) composed=9 (0x09)
+  base=140(0x8CW),141(0x8DW),130(0x82W),131(0x83W) water=4/4 fp=4F184562
+  neighbours: 34 35 9 25 25 25 12 10
+  w0 128 127 0x09 140 141 130 131 4F184562
+
+[wtile] world=0 (Overworld) at (126,128) composed=11 (0x0B)
+  base=132(0x84W),129(0x81W),130(0x82W),131(0x83W) water=4/4 fp=95FBCD47
+  neighbours: 24 12 25 25 25 25 9 36
+  w0 126 128 0x0B 132 129 130 131 95FBCD47
+
+[wtile] world=1 (Underground) at (119,106) composed=25 (0x19)
+  base=224(0xE0),225(0xE1),226(0xE2),227(0xE3) water=0/4 fp=A0E10357
+  neighbours: 25 25 25 28 25 25 25 25
+  w1 119 106 0x19 224 225 226 227 A0E10357
+
+[wtile] world=1 (Underground) at (126,99) composed=0 (0x00)
+  base=156(0x9CW),156(0x9CW),156(0x9CW),156(0x9CW) water=4/4 fp=EDB6A2C5
+  neighbours: 0 0 0 0 0 55 39 23
+  w1 126 99 0x00 156 156 156 156 EDB6A2C5
+
+[wtile] world=1 (Underground) at (125,104) composed=95 (0x5F)
+  base=32(0x20),30(0x1E),46(0x2E),156(0x9CW) water=1/4 fp=1C64807D
+  neighbours: 5 0 0 0 0 95 5 5
+  w1 125 104 0x5F 32 30 46 156 1C64807D
+
+[wtile] world=1 (Underground) at (122,110) composed=118 (0x76)
+  base=154(0x9AW),33(0x21),60(0x3C),155(0x9BW) water=2/4 fp=2753E822
+  neighbours: 5 5 5 5 20 19 3 5
+  w1 122 110 0x76 154 33 60 155 2753E822
+
+[wtile] world=1 (Underground) at (119,111) composed=117 (0x75)
+  base=32(0x20),152(0x98W),153(0x99W),57(0x39) water=2/4 fp=70CF5154
+  neighbours: 5 2 19 19 101 5 5 5
+  w1 119 111 0x75 32 152 153 57 70CF5154
+
+[wtile] world=1 (Underground) at (119,112) composed=101 (0x65)
+  base=136(0x88W),137(0x89W),24(0x18),25(0x19) water=2/4 fp=E710FED0
+  neighbours: 117 19 19 19 19 2 5 5
+  w1 119 112 0x65 136 137 24 25 E710FED0
+
+[wtile] world=1 (Underground) at (119,106) composed=25 (0x19)
+  base=224(0xE0),225(0xE1),226(0xE2),227(0xE3) water=0/4 fp=A0E10357
+  neighbours: 25 25 25 28 25 25 25 25
+  w1 119 106 0x19 224 225 226 227 A0E10357

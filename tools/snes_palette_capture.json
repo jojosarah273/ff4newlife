@@ -1,0 +1,20 @@
+{
+  "captures": [
+    {
+      "map_id": 36,
+      "map_name": "Baron",
+      "npcPalette1": 0,
+      "npcPalette2": 1,
+      "cgram_dump": "0000FF7F...",
+      "npcs": [
+        {
+          "x": 14,
+          "y": 17,
+          "sheet": 101,
+          "pal_field": 0,
+          "actual_palette_index": 17
+        }
+      ]
+    }
+  ]
+}

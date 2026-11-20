@@ -1,0 +1,1 @@
+{"id": 73, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 73, "switch1": 73, "x": 9, "randomMovement": false, "y": 7, "speed": 1, "animated": true, "reaction": 1, "palette": 1, "direction": 2}, "palette": 6, "name": "King's Room", "layout1": 73, "layout2": 35, "has_bg2": true, "overhang_cells": 12, "hide_z_cells": 910, "hide_bottom_cells": 0}

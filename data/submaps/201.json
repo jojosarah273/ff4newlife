@@ -1,0 +1,1 @@
+{"id": 201, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 238, "switch1": 238, "x": 16, "randomMovement": false, "y": 21, "speed": 0, "animated": false, "reaction": 1, "palette": 1, "direction": 2}, "palette": 17, "name": "Pass to Bab-il", "layout1": 201, "layout2": 35, "has_bg2": true, "overhang_cells": 16, "hide_z_cells": 816, "hide_bottom_cells": 0}

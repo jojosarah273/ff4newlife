@@ -1,0 +1,1 @@
+{"id": 77, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 153, "switch1": 153, "x": 4, "randomMovement": false, "y": 7, "speed": 2, "animated": true, "reaction": 1, "palette": 1, "direction": 0}, "palette": 6, "name": "Right Tower", "layout1": 77, "layout2": 35, "has_bg2": true, "overhang_cells": 16, "hide_z_cells": 990, "hide_bottom_cells": 0}

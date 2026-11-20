@@ -1,0 +1,1 @@
+{"id": 132, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 199, "switch1": 199, "x": 9, "randomMovement": false, "y": 27, "speed": 3, "animated": true, "reaction": 0, "palette": 2, "direction": 2}, "palette": 13, "name": "Mt.Ordeals", "layout1": 132, "layout2": 132, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 855, "hide_bottom_cells": 0}

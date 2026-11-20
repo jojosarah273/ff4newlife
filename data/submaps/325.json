@@ -1,0 +1,1 @@
+{"id": 325, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 180, "switch1": 180, "x": 4, "randomMovement": false, "y": 3, "speed": 2, "animated": true, "reaction": 1, "palette": 1, "direction": 2}, "palette": 15, "name": "Sylvan Cave", "layout1": 69, "layout2": 57, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 1006, "hide_bottom_cells": 0}

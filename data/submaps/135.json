@@ -1,0 +1,1 @@
+{"id": 135, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 101, "switch1": 101, "x": 10, "randomMovement": false, "y": 10, "speed": 3, "animated": false, "reaction": 0, "palette": 2, "direction": 3}, "palette": 13, "name": "Summit", "layout1": 135, "layout2": 130, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 313, "hide_bottom_cells": 0}

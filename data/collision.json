@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Per-tile collision overrides, keyed by tileset number then tile index.",
+    "Collision is a property of the TILE, not the cell (RPG-Maker model).",
+    "Default rule: passable if (byte1 & 0x03) != 0 (UpperZ | LowerZ).",
+    "Values: 0 = force impassable, 1 = force passable.",
+    "Evidence: every 'cur' cell in ff4_cell.txt is a cell the actor was",
+    "standing on, so pass=NO there is definitively a bug; and two sets of",
+    "tiles with IDENTICAL byte1/byte2 behave differently in the real game,",
+    "which is why the two prop bytes cannot express the rule alone."
+  ],
+  "tilesets": {
+    "5": {
+      "_name": "Town (Baron, Kaipo, Mist, Mysidia...)",
+      "impassable": [
+        17,
+        75,
+        76,
+        83,
+        84,
+        99,
+        109
+      ],
+      "passable": [
+        122
+      ],
+      "_passable_note": "122: byte1=0x00 but the actor stood on it (map-edge trigger tile)",
+      "_evidence": [
+        "Baron report 1 (green, should be red): 75,76,83,84,99,109",
+        "Mist report (green, should be red): 17  (byte1=0x02 byte2=0x0C, same shape as 75/76 = roofs)",
+        "Baron report 2 (red, should be green): relied on the default rule, only 122 needed an override"
+      ]
+    },
+    "6": {
+      "_name": "House/Interior (inns, shops, Astro Tower...)",
+      "impassable": [],
+      "passable": [],
+      "dirs": {
+        "19": "lr",
+        "20": "lr"
+      },
+      "_dirs_note": "Bit masks of allowed movement directions across this tile's edges. Bits: 1=up 2=right 4=down 8=left. 'lr'=0x0A. Applied to BOTH entering and leaving, so a bed blocks up/down in both directions."
+    }
+  },
+  "_dirs_legend": "1=up 2=right 4=down 8=left; 'lr' expands to right|left"
+}

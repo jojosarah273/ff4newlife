@@ -1,0 +1,1 @@
+{"id": 214, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 236, "switch1": 236, "x": 13, "randomMovement": false, "y": 10, "speed": 3, "animated": true, "reaction": 0, "palette": 1, "direction": 3}, "palette": 0, "name": "Enterprise", "layout1": 195, "layout2": 214, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 0, "hide_bottom_cells": 0}

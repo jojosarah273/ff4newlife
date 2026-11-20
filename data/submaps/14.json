@@ -1,0 +1,1 @@
+{"id": 14, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 55, "switch1": 55, "x": 4, "randomMovement": true, "y": 5, "speed": 0, "animated": true, "reaction": 1, "palette": 2, "direction": 1}, "palette": 5, "name": "Watery Pass-North", "layout1": 14, "layout2": 35, "has_bg2": true, "overhang_cells": 22, "hide_z_cells": 982, "hide_bottom_cells": 0}

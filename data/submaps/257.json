@@ -1,0 +1,1 @@
+{"id": 257, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 165, "switch1": 165, "x": 0, "randomMovement": false, "y": 0, "speed": 0, "animated": false, "reaction": 0, "palette": 0, "direction": 0}, "palette": 19, "name": "Tomra", "layout1": 1, "layout2": 53, "has_bg2": true, "overhang_cells": 32, "hide_z_cells": 827, "hide_bottom_cells": 56}

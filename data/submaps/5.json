@@ -1,0 +1,1 @@
+{"id": 5, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 178, "switch1": 178, "x": 14, "randomMovement": true, "y": 7, "speed": 2, "animated": true, "reaction": 1, "palette": 0, "direction": 1}, "palette": 4, "name": "Town of Toroia", "layout1": 5, "layout2": 34, "has_bg2": true, "overhang_cells": 28, "hide_z_cells": 581, "hide_bottom_cells": 233}

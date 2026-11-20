@@ -1,0 +1,1 @@
+{"id": 0, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 134, "switch1": 134, "x": 23, "randomMovement": false, "y": 5, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 4, "name": "Town of Baron", "layout1": 0, "layout2": 34, "has_bg2": true, "overhang_cells": 38, "hide_z_cells": 513, "hide_bottom_cells": 140}

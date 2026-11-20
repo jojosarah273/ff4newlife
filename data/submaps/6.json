@@ -1,0 +1,1 @@
+{"id": 6, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 178, "switch1": 178, "x": 14, "randomMovement": false, "y": 22, "speed": 2, "animated": true, "reaction": 1, "palette": 2, "direction": 2}, "palette": 24, "name": "Agart", "layout1": 6, "layout2": 34, "has_bg2": true, "overhang_cells": 20, "hide_z_cells": 421, "hide_bottom_cells": 91}

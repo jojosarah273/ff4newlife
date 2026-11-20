@@ -1,0 +1,1 @@
+{"id": 29, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 93, "switch1": 93, "x": 4, "randomMovement": false, "y": 8, "speed": 3, "animated": false, "reaction": 1, "palette": 0, "direction": 2}, "palette": 5, "name": "Black Chocobo Farm", "layout1": 29, "layout2": 35, "has_bg2": true, "overhang_cells": 12, "hide_z_cells": 926, "hide_bottom_cells": 0}

@@ -1,0 +1,1 @@
+{"id": 188, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 196, "switch1": 196, "x": 15, "randomMovement": false, "y": 16, "speed": 3, "animated": true, "reaction": 0, "palette": 2, "direction": 2}, "palette": 11, "name": "Lung", "layout1": 188, "layout2": 190, "has_bg2": true, "overhang_cells": 4, "hide_z_cells": 199, "hide_bottom_cells": 0}

@@ -1,0 +1,1 @@
+{"id": 19, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 186, "switch1": 186, "x": 3, "randomMovement": false, "y": 9, "speed": 2, "animated": true, "reaction": 1, "palette": 0, "direction": 0}, "palette": 5, "name": "Cafe", "layout1": 19, "layout2": 35, "has_bg2": true, "overhang_cells": 12, "hide_z_cells": 949, "hide_bottom_cells": 0}

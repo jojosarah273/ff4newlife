@@ -1,0 +1,1 @@
+{"id": 157, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 196, "switch1": 196, "x": 16, "randomMovement": false, "y": 17, "speed": 3, "animated": true, "reaction": 0, "palette": 0, "direction": 2}, "palette": 10, "name": "5F", "layout1": 157, "layout2": 155, "has_bg2": true, "overhang_cells": 8, "hide_z_cells": 782, "hide_bottom_cells": 0}

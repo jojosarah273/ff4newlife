@@ -1,0 +1,1 @@
+{"id": 126, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 27, "switch1": 27, "x": 15, "randomMovement": false, "y": 26, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 0}, "palette": 13, "name": "Mt.Hobs-West", "layout1": 126, "layout2": 130, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 737, "hide_bottom_cells": 0}

@@ -1,0 +1,1 @@
+{"id": 21, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 69, "switch1": 69, "x": 5, "randomMovement": false, "y": 4, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 7, "name": "1F", "layout1": 21, "layout2": 109, "has_bg2": true, "overhang_cells": 60, "hide_z_cells": 956, "hide_bottom_cells": 0}

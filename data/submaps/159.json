@@ -1,0 +1,1 @@
+{"id": 159, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 18, "switch1": 18, "x": 7, "randomMovement": false, "y": 17, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 0}, "palette": 10, "name": "7F", "layout1": 159, "layout2": 155, "has_bg2": true, "overhang_cells": 8, "hide_z_cells": 911, "hide_bottom_cells": 0}

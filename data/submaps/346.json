@@ -1,0 +1,1 @@
+{"id": 346, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 237, "switch1": 237, "x": 6, "randomMovement": false, "y": 4, "speed": 2, "animated": true, "reaction": 1, "palette": 0, "direction": 2}, "palette": 12, "name": "Cave Bahamut", "layout1": 90, "layout2": 98, "has_bg2": true, "overhang_cells": 14, "hide_z_cells": 27, "hide_bottom_cells": 0}

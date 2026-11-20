@@ -1,0 +1,1 @@
+{"id": 160, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 248, "switch1": 248, "x": 7, "randomMovement": false, "y": 12, "speed": 2, "animated": true, "reaction": 1, "palette": 1, "direction": 0}, "palette": 16, "name": "Grotto Adamant", "layout1": 160, "layout2": 35, "has_bg2": true, "overhang_cells": 4, "hide_z_cells": 888, "hide_bottom_cells": 0}

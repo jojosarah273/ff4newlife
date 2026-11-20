@@ -1,0 +1,1 @@
+{"id": 248, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 134, "switch1": 134, "x": 23, "randomMovement": false, "y": 5, "speed": 2, "animated": false, "reaction": 0, "palette": 0, "direction": 2}, "palette": 0, "name": "Cave of Lunarians", "layout1": 248, "layout2": 0, "has_bg2": true, "overhang_cells": 0, "hide_z_cells": 0, "hide_bottom_cells": 0}

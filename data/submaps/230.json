@@ -1,0 +1,1 @@
+{"id": 230, "w": 32, "h": 32, "cell": 16, "tileset": {"npcMSB": true, "switch0": 184, "switch1": 184, "x": 1, "randomMovement": true, "y": 6, "speed": 2, "animated": true, "reaction": 1, "palette": 1, "direction": 1}, "palette": 5, "name": "Armor Shop", "layout1": 9, "layout2": 35, "has_bg2": true, "overhang_cells": 12, "hide_z_cells": 989, "hide_bottom_cells": 0}
