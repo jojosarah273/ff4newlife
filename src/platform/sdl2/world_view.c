@@ -1056,6 +1056,683 @@ static void save_shot(SDL_Renderer *r)
     printf("[shot] %s (%dx%d)\n", out, win_w, win_h);
 }
 
+
+/* ================================================================== */
+/*  SUB-MAPS - recovery stage 2                                        */
+/*                                                                    */
+/*  Renders from the .ff4map packs (docs/ARCHITECTURE.md): per cell,   */
+/*  per sub-sprite j: lo/hi flags give sheet tile sidx, palette group  */
+/*  grp, hflip = !(hi & 0x40) (torch-audit convention), vflip =        */
+/*  hi & 0x80, front = hi & 0x20 (FF4KSTER rule, validated: front      */
+/*  tiles draw above the actor).  Two 512x512 layers per phase:       */
+/*  base = BG2 (opaque) + BG1 non-front, front = BG1 front.  Draw      */
+/*  order: base -> sprites -> front.  Byte-identical to the reference */
+/*  composites by construction (same decode as tools/ff4data.py       */
+/*  --verify).                                                        */
+/* ================================================================== */
+
+static int in_world = 1;                 /* 0 = on a sub-map */
+static int trace;                       /* FF4_TRACE */
+static int autowalk = -1;                /* FF4_AUTOWALK: held direction */
+static int submap_load(int id, int group);
+static void sm_actor_set(int x, int y, int dir);
+static const Uint8 dummy_keys_up[512] = { [SDL_SCANCODE_UP] = 1 };
+static const Uint8 dummy_keys_right[512] = { [SDL_SCANCODE_RIGHT] = 1 };
+static const Uint8 dummy_keys_down[512] = { [SDL_SCANCODE_DOWN] = 1 };
+static const Uint8 dummy_keys_left[512] = { [SDL_SCANCODE_LEFT] = 1 };
+static int sm_actor_visible(void);
+static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy);
+static int sm_phase_env = -1;            /* FF4_ANIMPHASE pins 0..3 */
+static int sm_noanim;                    /* FF4_NOANIM pins phase 0 */
+
+/* the cell program: per group, per cell, per sub-sprite */
+struct sm_prog {
+    const uint8_t *src;   /* 64 art bytes (static path) */
+    int slot;             /* anim slot 0..15, -1 = static */
+    int grp8;             /* palette group * 8 */
+    unsigned char hf, vf, front;
+};
+static struct sm_prog sm_cellp_bg1[2][1024][4];
+static struct sm_prog sm_cellp_bg2[2][1024][4];
+static int sm_layer_dirty = 1;           /* re-render the layers */
+static int sm_cur_phase = -1;
+
+static uint32_t *sm_lay_base;            /* 512*512 ARGB */
+static uint32_t *sm_lay_front;
+static SDL_Texture *sm_lay_base_tex;
+static SDL_Texture *sm_lay_front_tex;
+
+/* TfrBGAnimGfx @cb5f: phase advances every 8 frames, $7a & 0x18 */
+static int sm_anim_phase(void)
+{
+    if (sm_noanim)
+        return 0;
+    if (sm_phase_env >= 0 && sm_phase_env <= 3)
+        return sm_phase_env;
+    return (frame_counter >> 3) & 3;
+}
+
+/* decode one sub-sprite's flags into the program */
+static int sm_prog_decode(struct sm_prog *e, int b, int j)
+{
+    int lo = pk_flags[b * 2 + j * 0x100];
+    int hi = pk_flags[b * 2 + j * 0x100 + 1];
+    int sidx = lo + (hi & 3) * 0x100;
+
+    e->grp8 = ((hi >> 2) & 7) * 8;
+    e->hf = !(hi & 0x40);                 /* inverted on purpose */
+    e->vf = !!(hi & 0x80);
+    e->front = !!(hi & 0x20);
+    if (sidx >= 0x120 && sidx <= 0x12F) {
+        e->slot = sidx - 0x120;
+        e->src = NULL;
+    } else {
+        e->slot = -1;
+        e->src = pk_sheet_idx + (size_t)sidx * 64;
+    }
+    return 1;
+}
+
+/* draw one program entry into a 512x512 layer at cell (cx,cy) sub j */
+static void sm_draw_sub(uint32_t *dst, int cx, int cy, int j,
+                        const struct sm_prog *e, int phase, int opaque)
+{
+    const uint8_t *t = e->slot >= 0
+        ? pk_anim_idx + ((size_t)(phase * 16 + e->slot) * 64)
+        : e->src;
+    int pl = 0x100 * (pk_pal_line & 0xFF);
+    int ox = cx * 16 + (j % 2) * 8;
+    int oy = cy * 16 + (j / 2) * 8;
+    int x, y;
+
+    for (y = 0; y < 8; ++y) {
+        int sy = e->vf ? 7 - y : y;
+
+        for (x = 0; x < 8; ++x) {
+            int sx = e->hf ? 7 - x : x;
+            int c = t[sy * 8 + sx];
+            int co;
+
+            if (!c && !opaque)
+                continue;
+            co = pl + (e->grp8 + (c & 7)) * 4;
+            dst[(size_t)(oy + y) * 512 + ox + x] =
+                0xFF000000u |
+                ((uint32_t)pk_palettes[co + 0] << 16) |
+                ((uint32_t)pk_palettes[co + 1] << 8) |
+                pk_palettes[co + 2];
+        }
+    }
+}
+
+/* rebuild the two layers for (group, phase) */
+static void sm_render_layers(int group, int phase)
+{
+    int i, j, cx, cy;
+
+    memset(sm_lay_base, 0, (size_t)512 * 512 * 4);       /* opaque black */
+    memset(sm_lay_front, 0, (size_t)512 * 512 * 4);
+    for (i = 0; i < 1024; ++i) {
+        int b2 = pk_bg2c[group][i];
+        int b1 = pk_cells[group][i];
+
+        cx = i % 32;
+        cy = i / 32;
+        if (b2 < 128)
+            for (j = 0; j < 4; ++j)
+                sm_draw_sub(sm_lay_base, cx, cy, j,
+                            &sm_cellp_bg2[group][i][j], phase, 1);
+        if (b1 < 128)
+            for (j = 0; j < 4; ++j) {
+                const struct sm_prog *e = &sm_cellp_bg1[group][i][j];
+
+                sm_draw_sub(e->front ? sm_lay_front : sm_lay_base,
+                            cx, cy, j, e, phase, 0);
+            }
+    }
+    sm_cur_phase = phase;
+}
+
+/* content box: non-black bounds of base+front at phase 0, snapped to
+ * cells - identical to the guard's content_box(<id>.png) because the
+ * layers ARE the composite's pixels */
+static void sm_pack_compute_box(void)
+{
+    int x, y, x0 = -1, y0 = -1, x1 = -1, y1 = -1;
+    int phase_save = sm_cur_phase;
+
+    if (sm_cur_phase != 0)
+        sm_render_layers(in_world ? 0 : sm_layout_group, 0);
+    for (y = 0; y < 512; ++y)
+        for (x = 0; x < 512; ++x) {
+            uint32_t p = sm_lay_base[(size_t)y * 512 + x] |
+                         sm_lay_front[(size_t)y * 512 + x];
+
+            if ((p & 0x00FFFFFFu) == 0)
+                continue;
+            if (x0 < 0 || x < x0) x0 = x;
+            if (y0 < 0 || y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+        }
+    if (x0 < 0) {
+        sm_box_x0 = sm_box_y0 = 0;
+        sm_box_x1 = sm_box_y1 = 512;
+    } else {
+        sm_box_x0 = x0 & ~15;
+        sm_box_y0 = y0 & ~15;
+        sm_box_x1 = (x1 | 15) + 1;
+        sm_box_y1 = (y1 | 15) + 1;
+    }
+    if (phase_save != 0)
+        sm_render_layers(sm_layout_group, phase_save);
+    sm_layer_dirty = 1;
+}
+
+static void sm_layer_upload(SDL_Renderer *r)
+{
+    if (!sm_lay_base_tex) {
+        sm_lay_base_tex = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888,
+                                            SDL_TEXTUREACCESS_STREAMING,
+                                            512, 512);
+        /* textures default to SDL_BLENDMODE_NONE: the front layer must
+         * blend or its transparent pixels erase the base */
+        SDL_SetTextureBlendMode(sm_lay_base_tex, SDL_BLENDMODE_NONE);
+    }
+    if (!sm_lay_front_tex) {
+        sm_lay_front_tex = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888,
+                                             SDL_TEXTUREACCESS_STREAMING,
+                                             512, 512);
+        SDL_SetTextureBlendMode(sm_lay_front_tex, SDL_BLENDMODE_BLEND);
+    }
+    SDL_UpdateTexture(sm_lay_base_tex, NULL, sm_lay_base, 512 * 4);
+    SDL_UpdateTexture(sm_lay_front_tex, NULL, sm_lay_front, 512 * 4);
+}
+
+/* ---------------- NPC files (data/submaps/<id>.npc) ---------------- */
+
+static void sm_npc_load(int id)
+{
+    char p[512];
+    FILE *f;
+    char line[512];
+    int n = 0;
+
+    sm_npc_count = 0;
+    snprintf(p, sizeof p, "data/submaps/%d.npc", id);
+    if (!ff4_resolve_path(p, p, sizeof p))
+        return;
+    f = fopen(p, "r");
+    if (!f)
+        return;
+    while (n < SM_NPC_MAX && fgets(line, sizeof line, f)) {
+        int fld[8];
+        char *tab = strchr(line, '\t');
+        int k, got = 0;
+
+        for (k = 0; k < 8; ++k)
+            fld[k] = 0;
+        if (sscanf(line, "%d %d %d %d %d %d %d %d",
+                   &fld[0], &fld[1], &fld[2], &fld[3], &fld[4],
+                   &fld[5], &fld[6], &fld[7]) == 8)
+            got = 1;
+        if (!got)
+            continue;
+        sm_npc[n].x = fld[0];
+        sm_npc[n].y = fld[1];
+        sm_npc[n].dir = fld[2];
+        sm_npc[n].pal = fld[3];          /* ABSOLUTE npcPalettes index */
+        sm_npc[n].sheet = fld[4];
+        sm_npc[n].random = fld[5];
+        sm_npc[n].speed = fld[6];
+        sm_npc[n].animated = fld[7];
+        sm_npc[n].empty = 0;
+        sm_npc[n].built = 0;
+        if (tab) {
+            char *nl = strchr(tab, '\n');
+
+            if (nl)
+                *nl = 0;
+            snprintf(sm_npc[n].text, sizeof sm_npc[n].text, "%s", tab + 1);
+        } else {
+            sm_npc[n].text[0] = 0;
+        }
+        ++n;
+    }
+    fclose(f);
+    sm_npc_count = n;
+}
+
+/* ---------------- cell triggers (data/submaps/<id>.trig[1]) --------- */
+
+static void sm_trig_load(int id)
+{
+    char p[512];
+    FILE *f;
+    char line[256];
+    int n = 0;
+
+    sm_trig_count = 0;
+    snprintf(p, sizeof p, "data/submaps/%d.trig%s", id,
+             sm_trig_group ? "1" : "");
+    if (!ff4_resolve_path(p, p, sizeof p))
+        return;
+    f = fopen(p, "r");
+    if (!f)
+        return;
+    while (n < SM_TRIG_MAX && fgets(line, sizeof line, f)) {
+        struct { int x, y, map, dx, dy, dir, event; } t;
+
+        if (sscanf(line, "%d %d %d %d %d %d %d",
+                   &t.x, &t.y, &t.map, &t.dx, &t.dy, &t.dir, &t.event) != 7)
+            continue;
+        sm_trig[n].x = t.x;
+        sm_trig[n].y = t.y;
+        sm_trig[n].map = t.map;
+        sm_trig[n].dx = t.dx;
+        sm_trig[n].dy = t.dy;
+        sm_trig[n].dir = t.dir;
+        sm_trig[n].event = t.event;
+        ++n;
+    }
+    fclose(f);
+    sm_trig_count = n;
+    if (trace)
+        printf("[trig] %d triggers on map %d\n", n, id);
+}
+
+static int sm_trig_find(int cx, int cy)
+{
+    int k;
+
+    for (k = 0; k < sm_trig_count; ++k)
+        if (sm_trig[k].x == cx && sm_trig[k].y == cy)
+            return k;
+    return -1;
+}
+
+/* ---------------- the warp state machine --------------------------- */
+
+static int warp_frames_cur = -1;          /* >=0 while the curtain runs */
+static struct { int map, x, y, dir, event; } tw_pending;
+static int trace;
+
+/* apply a warp: to a sub-map or a world, preserving $1701 for map->map */
+static void warp_apply(int map, int x, int y, int dir, int event)
+{
+    if (map >= 251 && map <= 253) {
+        int w = map - 251;
+
+        if (trace)
+            printf("[warp] event %d -> world %d at (%d,%d) dir %d\n",
+                   event, w, x, y, dir);
+        if (load_world(w) == 0) {
+            ax = x * 16 + 8;
+            ay = y * 16 + 8;
+            facing = dir & 3;
+            in_world = 1;
+            sm_trig_group = (w == 1) ? 1 : 0;    /* $1701 from the source */
+            update_camera();
+        }
+        return;
+    }
+    if (map >= 251) {
+        /* 254/255 = spare world slots (event/overlay records): skip */
+        if (trace)
+            printf("[warp] event %d -> spare slot %d, ignored\n",
+                   event, map);
+        return;
+    }
+    if (trace)
+        printf("[warp] event %d -> map %d at (%d,%d) dir %d\n",
+               event, map, x, y, dir);
+    /* $1701 is preserved for map->map warps; a sub-map keeps its group */
+    if (submap_load(map, sm_trig_group) == 0) {
+        sm_actor_set(x, y, dir);
+        update_camera();
+    }
+}
+
+static void trigger_warp(int map, int x, int y, int dir, int event)
+{
+    if (map_depth < MAP_STACK_MAX) {
+        map_stack[map_depth].is_world = in_world;
+        map_stack[map_depth].id = in_world ? cur : sm_map;
+        map_stack[map_depth].cx = (int)ax / 16;
+        map_stack[map_depth].cy = (int)ay / 16;
+        ++map_depth;
+    }
+    tw_pending.map = map;
+    tw_pending.x = x;
+    tw_pending.y = y;
+    tw_pending.dir = dir;
+    tw_pending.event = event;
+    warp_frames_cur = 32;                 /* the curtain */
+    if (trace)
+        printf("[trig] event %d -> %d at (%d,%d) dir %d (curtain)\n",
+               event, map, x, y, dir);
+}
+
+/* exit tiles: props2 & 0x10 - pop the previous map */
+static void exit_tile_fire(int cx, int cy)
+{
+    if (map_depth <= 0) {
+        if (trace)
+            printf("[exit] (%d,%d) with an empty stack - ignored\n",
+                   cx, cy);
+        return;
+    }
+    --map_depth;
+    {
+        int m = map_stack[map_depth].id;
+        int x = map_stack[map_depth].cx;
+        int y = map_stack[map_depth].cy;
+
+        if (map_stack[map_depth].is_world) {
+            if (load_world(m) == 0) {
+                ax = x * 16 + 8;
+                ay = y * 16 + 8;
+                in_world = 1;
+                sm_trig_group = (m == 1) ? 1 : 0;
+                update_camera();
+            }
+        } else {
+            if (submap_load(m, sm_trig_group) == 0) {
+                sm_actor_set(x, y, facing);
+                update_camera();
+            }
+        }
+        if (trace)
+            printf("[exit] (%d,%d) -> back to %s %d at (%d,%d)\n",
+                   cx, cy, map_stack[map_depth].is_world ? "world" : "map",
+                   m, x, y);
+    }
+}
+
+/* place the actor at cell (x,y), nudged to the nearest walkable cell
+ * (the guards sample walkable cells, but a warp target can be a wall) */
+static void sm_actor_set(int x, int y, int dir)
+{
+    int bx = x, by = y, r;
+
+    if (x >= 0 && y >= 0 && x < 32 && y < 32 && !sm_walk[y * 32 + x]) {
+        for (r = 1; r <= 3 && !sm_walk[by * 32 + bx]; ++r) {
+            int dx, dy;
+
+            for (dy = -r; dy <= r; ++dy)
+                for (dx = -r; dx <= r; ++dx) {
+                    int nx = x + dx, ny = y + dy;
+
+                    if (nx < 0 || ny < 0 || nx > 31 || ny > 31)
+                        continue;
+                    if (sm_walk[ny * 32 + nx]) {
+                        bx = nx;
+                        by = ny;
+                        dx = r + 1;
+                        dy = r + 1;
+                        break;
+                    }
+                }
+        }
+    }
+    ax = bx * 16 + 8;
+    ay = by * 16 + 8;
+    facing = dir & 3;
+    if (trace)
+        printf("[actor] cell=(%d,%d) facing %d\n", bx, by, facing);
+}
+
+/* ---------------- sub-map load ------------------------------------ */
+
+static int submap_load(int id, int group)
+{
+    char p[512];
+    const char *infx;
+    int g, i, j;
+
+    if (pk_load(id, group) != 0) {
+        fprintf(stderr, "[submap] no pack for map %d\n", id);
+        return -1;
+    }
+    g = (group && pk_has_g1) ? 1 : 0;
+    sm_layout_group = g;
+
+    /* art + flags for this tileset */
+    snprintf(p, sizeof p, "data/gfx/sheets/sheet%d.idx", pk_sheet_id);
+    free(pk_sheet_idx);
+    pk_sheet_idx = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/gfx/anim/ts%d.idx", pk_ts);
+    free(pk_anim_idx);
+    pk_anim_idx = read_file(p, NULL);
+    snprintf(p, sizeof p, "data/gfx/tileflags/ts%d.bin", pk_ts);
+    free(pk_flags);
+    pk_flags = read_file(p, NULL);
+    free(pk_palettes);
+    pk_palettes = read_file("data/gfx/palettes.bin", NULL);
+    if (!pk_sheet_idx || !pk_anim_idx || !pk_flags || !pk_palettes) {
+        fprintf(stderr, "[submap] map %d: art files missing\n", id);
+        return -1;
+    }
+
+    /* the cell programs for the selected group: BG1 and BG2 separate */
+    for (i = 0; i < 1024; ++i) {
+        int b1 = pk_cells[g][i];
+        int b2 = pk_bg2c[g][i];
+
+        for (j = 0; j < 4; ++j) {
+            if (b1 < 128)
+                sm_prog_decode(&sm_cellp_bg1[g][i][j], b1, j);
+            if (b2 < 128)
+                sm_prog_decode(&sm_cellp_bg2[g][i][j], b2, j);
+        }
+    }
+
+    infx = sm_layout_infix(id);
+    snprintf(p, sizeof p, "data/submaps/%d%s.props", id, infx);
+    { uint8_t *d = read_file(p, NULL);
+
+      if (d) { memcpy(sm_props, d, 2048); free(d); }
+      else memset(sm_props, 0, sizeof sm_props); }
+    snprintf(p, sizeof p, "data/submaps/%d%s.walk", id, infx);
+    { uint8_t *d = read_file(p, NULL);
+
+      if (d) { memcpy(sm_walk, d, 1024); free(d); }
+      else memset(sm_walk, 0, sizeof sm_walk); }
+    snprintf(p, sizeof p, "data/submaps/%d%s.dirs", id, infx);
+    { uint8_t *d = read_file(p, NULL);
+
+      if (d) { memcpy(sm_dirs, d, 1024); free(d); }
+      else memset(sm_dirs, 0, sizeof sm_dirs); }
+
+    if (!sm_lay_base) {
+        sm_lay_base = (uint32_t *)malloc((size_t)512 * 512 * 4);
+        sm_lay_front = (uint32_t *)malloc((size_t)512 * 512 * 4);
+    }
+    sm_render_layers(g, 0);
+    { const char *lay = getenv("FF4_SM_LAYER");
+
+      if (lay && sm_lay_base) {
+          ff4_png_write(lay, 512, 512, sm_lay_base);
+          { char f2[600];
+
+            snprintf(f2, sizeof f2, "%s.front", lay);
+            ff4_png_write(f2, 512, 512, sm_lay_front); }
+      } }
+    /* NB: these debug dumps go through ff4_png_write, which emits the
+     * buffer bytes as RGBA - the in-memory layers are ARGB, so the
+     * dumps are r/b-swapped.  For pixel-exact dumps swap in python. */
+    sm_pack_compute_box();
+    sm_trig_load(id);
+    sm_npc_load(id);
+
+    sm_map = id;
+    in_world = 0;
+    if (trace)
+        printf("[submap] map %d group %d: tileset %d sheet %d pal %d, "
+               "box (%d,%d)-(%d,%d)\n",
+               id, g, pk_ts, pk_sheet_id, pk_pal_line,
+               sm_box_x0, sm_box_y0, sm_box_x1, sm_box_y1);
+    return 0;
+}
+
+/* the direct jump (FF4_WARPTO): entry world from data/world/entryworld.bin
+ * (maps whose every warp entry comes from one world; 255 = mixed/none) */
+static int warp_to_map(int id)
+{
+    uint8_t *ew = read_file("data/world/entryworld.bin", NULL);
+    int group = 0;
+    const char *e;
+
+    if (ew && ew[id] == 1)
+        group = 1;                       /* underground-only entry */
+    free(ew);
+    if ((e = getenv("FF4_LAYOUTG1")) && *e)
+        group = atoi(e) ? 1 : 0;         /* forced either way */
+    sm_trig_group = group;
+    return submap_load(id, group);
+}
+
+/* ---------------- sub-map camera ----------------------------------- */
+
+static void update_camera_sm(void)
+{
+    int axc = (int)ax & ~15;              /* the actor's cell, in px */
+    int ayc = (int)ay & ~15;
+    int bw = sm_box_x1 - sm_box_x0, bh = sm_box_y1 - sm_box_y0;
+
+    if (bw <= vw) {
+        cam_x = sm_box_x0 - (vw - bw) / 2;     /* centred; may be negative */
+    } else {
+        /* the guard's rule: ax + 8 - (vw/2 - 8) with ax = cell*16 */
+        cam_x = axc - (vw / 2 - 8) + 8;
+        if (cam_x < sm_box_x0)
+            cam_x = sm_box_x0;
+        if (cam_x > sm_box_x0 + bw - vw)
+            cam_x = sm_box_x0 + bw - vw;
+    }
+    if (bh <= vh) {
+        cam_y = sm_box_y0 - (vh - bh) / 2;
+    } else {
+        /* ay + 8 - (vh/2 + 7) */
+        cam_y = ayc - (vh / 2 + 7) + 8;
+        if (cam_y < sm_box_y0)
+            cam_y = sm_box_y0;
+        if (cam_y > sm_box_y0 + bh - vh)
+            cam_y = sm_box_y0 + bh - vh;
+    }
+}
+
+/* ---------------- sub-map drawing ---------------------------------- */
+
+static void draw_submap_view(SDL_Renderer *r)
+{
+    int phase = sm_anim_phase();
+    int ox = (win_w - (int)(vw * zoom)) / 2;
+    int oy = (win_h - (int)(vh * zoom)) / 2;
+    int cx = (int)cam_x, cy = (int)cam_y;
+
+    if (phase != sm_cur_phase || sm_layer_dirty) {
+        sm_render_layers(sm_layout_group, phase);
+        sm_layer_dirty = 0;
+        sm_layer_upload(r);
+    }
+    /* the 256x224 window over the 512x512 layers; a negative camera
+     * (small centred rooms) shows black around the room */
+    {
+        SDL_Rect src = { cx < 0 ? 0 : cx, cy < 0 ? 0 : cy,
+                         cx < 0 ? vw + cx : (cx + vw > 512 ? 512 - cx : vw),
+                         cy < 0 ? vh + cy : (cy + vh > 512 ? 512 - cy : vh) };
+        SDL_Rect dst = { ox + (cx < 0 ? -cx : 0) * (int)zoom,
+                         oy + (cy < 0 ? -cy : 0) * (int)zoom,
+                         src.w * (int)zoom, src.h * (int)zoom };
+
+        SDL_RenderCopy(r, sm_lay_base_tex, &src, &dst);
+        /* sprites */
+        if (!getenv("FF4_NOBASE"))
+            sm_draw_sprites(r, ox, oy);
+        if (!getenv("FF4_NOFRONT"))
+            SDL_RenderCopy(r, sm_lay_front_tex, &src, &dst);
+    }
+}
+
+/* placeholder sprite pass: the party + NPCs.  NPC frame tables are
+ * decoded from sprite.asm in stage 3 (the sprite sweep guard); the
+ * stage-2 guards mask sprite cells, so a faithful frame table lands
+ * with verify_engine_sprites. */
+static void npc_draw_one(SDL_Renderer *r, int i, int ox, int oy)
+{
+    char p[512];
+    static int cur_sheet = -1, cur_pal = -1;
+    static uint8_t *sh = NULL; static size_t shlen = 0;
+    static uint8_t npal[8][4];
+    int frame = sm_npc[i].dir * 2 +
+                (sm_npc[i].animated && !npc_frozen &&
+                 (frame_counter & 0x10) ? 1 : 0);
+    int k;
+
+    if (cur_sheet != sm_npc[i].sheet || cur_pal != sm_npc[i].pal) {
+        snprintf(p, sizeof p, "data/gfx/gfx/mapSpriteGraphics[%d].bin",
+                 sm_npc[i].sheet);
+        free(sh);
+        sh = read_file(p, &shlen);
+        snprintf(p, sizeof p, "data/gfx/gfx/npcPalettes[%d].bin",
+                 sm_npc[i].pal);
+        { uint8_t *d = read_file(p, NULL);
+
+          if (d) { memcpy(npal, d, 32); free(d); } }
+        cur_sheet = sm_npc[i].sheet;
+        cur_pal = sm_npc[i].pal;
+    }
+    if (!sh || shlen < 8 * 64)
+        return;
+    /* the NPC sheets hold one 16x16 facing (4 tiles) per frame pair in
+     * tile order 0..3 / 4..7; side facings reuse the same art until
+     * the exact NPC tile tables land (stage 3) */
+    for (k = 0; k < 4; ++k) {
+        int t = (frame & 1) * 4 + k;
+        const uint8_t *art = sh + (size_t)t * 64;
+        int x, y;
+
+        for (y = 0; y < 8; ++y)
+            for (x = 0; x < 8; ++x) {
+                int ci = art[y * 8 + x];
+
+                if (!ci)
+                    continue;
+                SDL_SetRenderDrawColor(r, npal[ci][0], npal[ci][1],
+                                       npal[ci][2], 0xFF);
+                SDL_RenderFillRect(r, &(SDL_Rect){
+                    ox + (int)((sm_npc[i].x * 16 + (k % 2) * 8 - cam_x) * zoom),
+                    oy + (int)((sm_npc[i].y * 16 + (k / 2) * 8 - cam_y) * zoom),
+                    (int)(zoom + 0.5), (int)(zoom + 0.5) });
+            }
+    }
+}
+
+static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy)
+{
+    int i;
+
+    for (i = 0; i < sm_npc_count; ++i)
+        npc_draw_one(r, i, ox, oy);
+    if (sm_actor_visible())
+        draw_actor(r,
+                   ox + (int)(((int)ax - cam_x - 8) * zoom),
+                   oy + (int)(((int)ay - cam_y - 8) * zoom), zoom);
+}
+
+/* hide rule for the actor's own cell: props2 & 0x04 (DrawPlayerSub @b2d6
+ * moves the OAM entries off-screen); refined z rules land with the
+ * bridge guard in stage 3 */
+static int sm_actor_visible(void)
+{
+    int cx = (int)ax / 16, cy = (int)ay / 16;
+
+    if (cx < 0 || cy < 0 || cx > 31 || cy > 31)
+        return 1;
+    return !(sm_props[(cy * 32 + cx) * 2 + 1] & 0x04);
+}
+
 /* ---------------------------- main -------------------------------- */
 
 int main(int argc, char **argv)
@@ -1083,6 +1760,24 @@ int main(int argc, char **argv)
         ay = atoi(e) * 16 + 8;
     if ((e = getenv("FF4_LAVASTEP")) && *e)
         lava_step_env = atoi(e);
+    if ((e = getenv("FF4_TRACE")) && atoi(e))
+        trace = 1;
+    if ((e = getenv("FF4_ANIMPHASE")) && *e)
+        sm_phase_env = atoi(e);
+    if ((e = getenv("FF4_NOANIM")) && atoi(e))
+        sm_noanim = 1;
+    if ((e = getenv("FF4_NPCFREEZE")) && atoi(e))
+        npc_frozen = 1;
+    if ((e = getenv("FF4_FACING")) && *e)
+        facing = atoi(e) & 3;
+    { const char *aw = getenv("FF4_AUTOWALK");
+
+      if (aw && *aw) {
+          if (!strcmp(aw, "up")) autowalk = 0;
+          else if (!strcmp(aw, "right")) autowalk = 1;
+          else if (!strcmp(aw, "down")) autowalk = 2;
+          else if (!strcmp(aw, "left")) autowalk = 3;
+      } }
     if ((e = getenv("FF4_SHOT"))) {
         const char *d = getenv("FF4_SHOT_DELAY");
 
@@ -1093,10 +1788,10 @@ int main(int argc, char **argv)
     if (run_report_env())
         return 0;
 
-    /* sub-maps return in recovery stage 2 */
-    if (getenv("FF4_WARPTO"))
-        fprintf(stderr, "[stage1] sub-maps return in recovery stage 2 "
-                        "(world view only for now)\n");
+    { const char *wt = getenv("FF4_WARPTO");
+
+      if (wt && *wt)
+          warp_to_map(atoi(wt)); }
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -1122,7 +1817,12 @@ int main(int argc, char **argv)
     vw = 256; vh = 224;                    /* SNES logical viewport */
     zoom = zoom_env;
     vbuf = (uint32_t *)malloc((size_t)vw * vh * 4);
-    update_camera();
+    if (in_world)
+        update_camera();
+    else {
+        sm_actor_set((int)ax / 16, (int)ay / 16, facing);
+        update_camera_sm();
+    }
 
     while (!quit) {
         SDL_Event ev;
@@ -1175,7 +1875,76 @@ int main(int argc, char **argv)
         }
 
         keys = SDL_GetKeyboardState(NULL);
-        if (tile_report) {
+        if (!in_world) {
+            /* sub-map movement: 1 px per frame, cell-gated by .walk */
+            double dx = 0, dy = 0;
+
+            if (autowalk >= 0) {
+                if (autowalk == 0) keys = dummy_keys_up;
+                else if (autowalk == 1) keys = dummy_keys_right;
+                else if (autowalk == 2) keys = dummy_keys_down;
+                else keys = dummy_keys_left;
+            }
+            if (keys[SDL_SCANCODE_LEFT])  { dx = -1; facing = 3; }
+            if (keys[SDL_SCANCODE_RIGHT]) { dx = 1;  facing = 1; }
+            if (keys[SDL_SCANCODE_UP])   { dy = -1; facing = 0; }
+            if (keys[SDL_SCANCODE_DOWN]) { dy = 1;  facing = 2; }
+            moving = (dx || dy) ? 1 : 0;
+            if (moving) {
+                /* the cell the leading edge would enter */
+                int lead_x = (int)ax + (dx > 0 ? 8 : dx < 0 ? -9 : 0);
+                int lead_y = (int)ay + (dy > 0 ? 8 : dy < 0 ? -9 : 0);
+                int ncx = lead_x / 16, ncy = lead_y / 16;
+                int ocx = (int)ax / 16, ocy = (int)ay / 16;
+
+                if (ncx < 0 || ncy < 0 || ncx > 31 || ncy > 31)
+                    ncx = ocx, ncy = ocy;
+                if (noclip || sm_walk[ncy * 32 + ncx]) {
+                    ax += dx;
+                    ay += dy;
+                    ++move_phase;
+                    if ((int)ax / 16 != ocx || (int)ay / 16 != ocy) {
+                        int k = sm_trig_find((int)ax / 16, (int)ay / 16);
+
+                        if (k >= 0)
+                            trigger_warp(sm_trig[k].map, sm_trig[k].dx,
+                                         sm_trig[k].dy, sm_trig[k].dir,
+                                         sm_trig[k].event);
+                        else if (sm_props[((int)ay / 16 * 32 +
+                                           (int)ax / 16) * 2 + 1] & 0x10)
+                            exit_tile_fire((int)ax / 16, (int)ay / 16);
+                    }
+                }
+            }
+            update_camera_sm();
+            ++frame_counter;
+        } else if (autowalk >= 0 && !tile_report) {
+            /* headless traversal on the world map too */
+            static const Uint8 up[] = { [SDL_SCANCODE_UP] = 1 };
+            static const Uint8 right[] = { [SDL_SCANCODE_RIGHT] = 1 };
+            static const Uint8 down[] = { [SDL_SCANCODE_DOWN] = 1 };
+            static const Uint8 left[] = { [SDL_SCANCODE_LEFT] = 1 };
+
+            keys = autowalk == 0 ? up : autowalk == 1 ? right :
+                   autowalk == 2 ? down : left;
+            { double dx = 0, dy = 0;
+
+              if (keys[SDL_SCANCODE_LEFT])  { dx = -1; facing = 3; }
+              if (keys[SDL_SCANCODE_RIGHT]) { dx = 1;  facing = 1; }
+              if (keys[SDL_SCANCODE_UP])    { dy = -1; facing = 0; }
+              if (keys[SDL_SCANCODE_DOWN])  { dy = 1;  facing = 2; }
+              moving = (dx || dy) ? 1 : 0;
+              if (moving &&
+                  world_passable(((int)ax + (dx > 0 ? 8 : -9)) / 16,
+                                 (int)ay / 16) &&
+                  world_passable((int)ax / 16,
+                                 ((int)ay + (dy > 0 ? 8 : -9)) / 16)) {
+                  ax += dx;
+                  ay += dy;
+                  ++move_phase;
+              }
+              ++party_frame; }
+        } else if (tile_report) {
             /* the cursor takes the arrows */
             if (keys[SDL_SCANCODE_LEFT])  --cur_cx;
             if (keys[SDL_SCANCODE_RIGHT]) ++cur_cx;
@@ -1206,6 +1975,19 @@ int main(int argc, char **argv)
             ++party_frame;            /* $7b free-run */
         }
 
+        /* the warp curtain: apply at the midpoint (16 of 32) */
+        if (warp_frames_cur >= 0) {
+            curtain_this_frame = 1;
+            if (warp_frames_cur == 16)
+                warp_apply(tw_pending.map, tw_pending.x, tw_pending.y,
+                           tw_pending.dir, tw_pending.event);
+            --warp_frames_cur;
+            if (warp_frames_cur < 0)
+                curtain_this_frame = 0;
+        } else {
+            curtain_this_frame = 0;
+        }
+
         /* lava cadence: one LavaPalTbl step every 16 frames */
         if (W->lavapal) {
             int step = lava_step_env >= 0
@@ -1216,13 +1998,18 @@ int main(int argc, char **argv)
             lava_sync_pack(W);
         }
 
-        update_camera();
+        if (in_world)
+            update_camera();
+        else
+            update_camera_sm();
 
         /* ---- draw ---- */
         SDL_SetRenderDrawColor(ren, 0, 0, 0, 0xFF);
         SDL_RenderClear(ren);
 
-        if (whole_map) {
+        if (!in_world) {
+            draw_submap_view(ren);
+        } else if (whole_map) {
             draw_whole_map(ren);
         } else {
             if (wp_loaded)
