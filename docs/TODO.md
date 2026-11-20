@@ -1,6 +1,27 @@
 # TODO — field scene
 
-Ordered. Everything at the top of a section is blocked on the item above it.
+## 0. Recovery — world_view.c rebuild (IN PROGRESS)
+
+The engine body was lost to a bad edit (no VCS existed); git starts at
+commit 2d695b5.  All data/tools/guards survived; the engine is being
+rebuilt in stages, each landing only with its guards green.
+
+- **Stage 1 DONE (commit e1d0fd3):** boot, camera, movement, world view
+  (pack path + `.idx` compose A/B, 0 px on all three worlds), actor sprite
+  (ROM `PlayerSpriteTiles @c0c4`), lava cycle, `[wtile]` reporter
+  (byte-faithful, fingerprints match the recorded session).  Guards green:
+  `world_tile_report`, `lava_palette`, `ff4data_packs`, determinism.
+  Conventions re-proven during the rebuild: `mapSpriteGraphics[n].bin` are
+  already 8bpp-expanded (64 B/tile, logical order); world `.idx` is
+  assign-shifted (a pixel maps directly); `ff4_png_write` wants ABGR readback.
+- **Stage 2 (next):** `submap_load`, atlas builder + pack draw passes,
+  warps/triggers, NPC/actor sprites → targets `submap_view`, `layout_group`,
+  `warp_audit`, `field_animation`.
+- **Stage 3:** dialog/message box, bridge z, NPC cadence → the full 16-guard
+  suite green exactly as before the incident.
+
+The quick suite currently reports 10/15 PASS; the five failures are all
+sub-map guards awaiting stages 2-3.
 
 ---
 
