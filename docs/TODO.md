@@ -20,10 +20,12 @@ rebuilt in stages, each landing only with its guards green.
   triggers/curtain/exit tiles, `FF4_AUTOWALK` traversal.  Guards green:
   `submap_view` (8/8 exact), `layout_group`, `field_animation`; quick suite
   13/15.
-- **Stage 3 (next):** message box (window text on the view), bridge z
-  (byte2 0x04 hide + 0x08 OAM-priority split, lane rules), exact NPC tile
-  tables (sprite sweep).  Targets: the full 16-guard suite green + the full
-  sprite sweep 0-mismatch, exactly as before the incident.
+- **Stage 3 DONE (commit 1fc0690):** message box (FF4_DIALOG), bridge z
+  (the 0x08 OAM split + lane-aware 0x04 hide, $d2 held on bridges), exact
+  NPC sprites (NPCSpriteTbl @f846 + MapSpritePal CGRAM slot palettes).
+  **The full 16-guard suite is green and the full sprite sweep is
+  338/338 pixel-identical, 0 mismatched - the pre-incident state is
+  fully restored.**
 - **Stage 3:** dialog/message box, bridge z, NPC cadence → the full 16-guard
   suite green exactly as before the incident.
 
