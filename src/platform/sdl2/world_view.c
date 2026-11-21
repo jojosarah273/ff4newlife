@@ -710,7 +710,8 @@ static const uint8_t player_sprite_tiles[8][8] = {
  * planar, expanded at load to 64 index bytes per tile. */
 static uint8_t *spr_sheet;          /* tiles*64 palette indices, MSB-left */
 static int spr_sheet_len;
-static uint8_t spr_rgba[8][4];       /* 8 colors RGBA from npcPalettes[n] */
+static uint8_t spr_rgba[8][4];       /* 8 colors RGBA, MapSpritePal entry */
+static uint8_t *spr_slotpal;          /* data/gfx/pal/map_sprite_pal.bin */
 static int spr_loaded;
 
 /* facing & animation state ($1705, $7b, $06 in DrawPlayerSub) */
@@ -747,13 +748,27 @@ static void sprite_load(int sheet, int pal)
     spr_sheet_len = nt;
     (void)t;
 
-    snprintf(p, sizeof p, "data/gfx/gfx/npcPalettes[%d].bin", pal);
-    raw = read_file(p, NULL);
-    if (raw) {
-        memcpy(spr_rgba, raw, 8 * 4);
-        free(raw);
+    /* `pal` is a MapSpritePal entry (the CGRAM slot model): 8 BGR555
+     * colours from data/gfx/pal/map_sprite_pal.bin - the palette the
+     * 488/488 sprite verification was done against */
+    free(spr_slotpal);
+    spr_slotpal = read_file("data/gfx/pal/map_sprite_pal.bin", NULL);
+    if (spr_slotpal && pal >= 0 && pal * 16 + 16 <= 576) {
+        int k;
+
+        for (k = 0; k < 8; ++k) {
+            unsigned w = (unsigned)spr_slotpal[pal * 16 + k * 2] |
+                         ((unsigned)spr_slotpal[pal * 16 + k * 2 + 1] << 8);
+
+            spr_rgba[k][0] = (uint8_t)(((w & 0x1F) << 3) | ((w >> 2) & 7));
+            spr_rgba[k][1] = (uint8_t)((((w >> 5) & 0x1F) << 3) |
+                                       ((w >> 7) & 7));
+            spr_rgba[k][2] = (uint8_t)((((w >> 10) & 0x1F) << 3) |
+                                       ((w >> 12) & 7));
+            spr_rgba[k][3] = 0xFF;
+        }
     } else {
-        fprintf(stderr, "[sprite] missing %s\n", p);
+        fprintf(stderr, "[sprite] map_sprite_pal.bin entry %d missing\n", pal);
         return;
     }
     spr_loaded = 1;
@@ -804,8 +819,15 @@ static void spr_tile(SDL_Renderer *r, int tile, int flip,
 
 /* DrawPlayerSub @b284: frame index = facing*2 + step, the four
  * subtiles are laid out 2x2 (top pair = head, bottom pair = feet);
- * $06 = 1 while stepping (the 1px walk bob). */
-static void draw_actor(SDL_Renderer *r, int sx, int sy, double z)
+ * $06 = 1 while stepping (the 1px walk bob).  `half` selects the OAM
+ * priority halves for the byte2 & 0x08 bridge split (0 = whole,
+ * 1 = top pair only, 2 = bottom pair only). */
+#define ACTOR_WHOLE 0
+#define ACTOR_TOP   1
+#define ACTOR_BOTTOM 2
+
+static void draw_actor_half(SDL_Renderer *r, int sx, int sy, double z,
+                            int half)
 {
     int frame = facing * 2 + (moving && (party_frame & 8) ? 1 : 0);
     int bob = (moving && !(move_phase & 1) && (party_frame & 8)) ? 1 : 0;
@@ -816,12 +838,21 @@ static void draw_actor(SDL_Renderer *r, int sx, int sy, double z)
     sx -= (int)(bob * z);
     sy -= (int)(bob * z);
     for (k = 0; k < 4; ++k) {
+        if (half == ACTOR_TOP && k >= 2)
+            continue;
+        if (half == ACTOR_BOTTOM && k < 2)
+            continue;
         int tile = player_sprite_tiles[frame][k * 2];
         int flip = (player_sprite_tiles[frame][k * 2 + 1] & 0x40) ? 1 : 0;
 
         spr_tile(r, tile, flip,
                  sx + (int)((k % 2) * 8 * z), sy + (int)((k / 2) * 8 * z), z);
     }
+}
+
+static void draw_actor(SDL_Renderer *r, int sx, int sy, double z)
+{
+    draw_actor_half(r, sx, sy, z, ACTOR_WHOLE);
 }
 
 /* ---------------------- the world viewport ------------------------ */
@@ -1074,6 +1105,10 @@ static void save_shot(SDL_Renderer *r)
 static int in_world = 1;                 /* 0 = on a sub-map */
 static int trace;                       /* FF4_TRACE */
 static int autowalk = -1;                /* FF4_AUTOWALK: held direction */
+/* key state built purely from SDL events: SDL_GetKeyboardState can see
+ * the real display server's keys even under the dummy driver, which
+ * made headless guard runs drift one or two cells */
+static Uint8 held[SDL_NUM_SCANCODES];
 static int submap_load(int id, int group);
 static void sm_actor_set(int x, int y, int dir);
 static const Uint8 dummy_keys_up[512] = { [SDL_SCANCODE_UP] = 1 };
@@ -1082,6 +1117,12 @@ static const Uint8 dummy_keys_down[512] = { [SDL_SCANCODE_DOWN] = 1 };
 static const Uint8 dummy_keys_left[512] = { [SDL_SCANCODE_LEFT] = 1 };
 static int sm_actor_visible(void);
 static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy);
+static int sm_actor_split;               /* the head pending above the front */
+static void draw_dialog(SDL_Renderer *r, int ox, int oy, double z);
+static int dlg_on;
+static char dlg_text[320];
+static int sm_actor_zmode(int cx, int cy);
+static void sm_actor_blit(SDL_Renderer *r, int ox, int oy, int half);
 static int sm_phase_env = -1;            /* FF4_ANIMPHASE pins 0..3 */
 static int sm_noanim;                    /* FF4_NOANIM pins phase 0 */
 
@@ -1286,7 +1327,7 @@ static void sm_npc_load(int id)
         sm_npc[n].random = fld[5];
         sm_npc[n].speed = fld[6];
         sm_npc[n].animated = fld[7];
-        sm_npc[n].empty = 0;
+        sm_npc[n].empty = npc_is_hidden(id, fld[0], fld[1]);
         sm_npc[n].built = 0;
         if (tab) {
             char *nl = strchr(tab, '\n');
@@ -1455,7 +1496,8 @@ static void sm_actor_set(int x, int y, int dir)
 {
     int bx = x, by = y, r;
 
-    if (x >= 0 && y >= 0 && x < 32 && y < 32 && !sm_walk[y * 32 + x]) {
+    if (x >= 0 && y >= 0 && x < 32 && y < 32 && !sm_walk[y * 32 + x] &&
+        !noclip) {
         for (r = 1; r <= 3 && !sm_walk[by * 32 + bx]; ++r) {
             int dx, dy;
 
@@ -1478,8 +1520,12 @@ static void sm_actor_set(int x, int y, int dir)
     ax = bx * 16 + 8;
     ay = by * 16 + 8;
     facing = dir & 3;
+    player_z = sm_props[(by * 32 + bx) * 2] & 3;   /* $d2 from the cell */
     if (trace)
-        printf("[actor] cell=(%d,%d) facing %d\n", bx, by, facing);
+        printf("[actor] cell=(%d,%d) facing %d z=%d\n", bx, by, facing,
+               player_z);
+    if (bx != x || by != y)
+        printf("[actor] spawn cell impassable, moved to (%d,%d)\n", bx, by);
 }
 
 /* ---------------- sub-map load ------------------------------------ */
@@ -1565,6 +1611,24 @@ static int submap_load(int id, int group)
     sm_trig_load(id);
     sm_npc_load(id);
 
+    if (trace)
+        printf("[npc] map %d: %d npcs loaded\n", id, sm_npc_count);
+    if (dlg_on) {
+        int best = -1, bd = 1 << 30;
+        int px0 = (int)ax / 16, py0 = (int)ay / 16;
+
+        for (i = 0; i < sm_npc_count; ++i) {
+            int d = (sm_npc[i].x - px0) * (sm_npc[i].x - px0) +
+                   (sm_npc[i].y - py0) * (sm_npc[i].y - py0);
+
+            if (d < bd && sm_npc[i].text[0]) {
+                bd = d;
+                best = i;
+            }
+        }
+        snprintf(dlg_text, sizeof dlg_text, "%s",
+                 best >= 0 ? sm_npc[best].text : "........");
+    }
     sm_map = id;
     in_world = 0;
     if (trace)
@@ -1646,19 +1710,32 @@ static void draw_submap_view(SDL_Renderer *r)
                          oy + (cy < 0 ? -cy : 0) * (int)zoom,
                          src.w * (int)zoom, src.h * (int)zoom };
 
-        SDL_RenderCopy(r, sm_lay_base_tex, &src, &dst);
-        /* sprites */
         if (!getenv("FF4_NOBASE"))
-            sm_draw_sprites(r, ox, oy);
+            SDL_RenderCopy(r, sm_lay_base_tex, &src, &dst);
+        /* sprites */
+        sm_draw_sprites(r, ox, oy);
         if (!getenv("FF4_NOFRONT"))
             SDL_RenderCopy(r, sm_lay_front_tex, &src, &dst);
+        if (sm_actor_split)
+            sm_actor_blit(r, ox, oy, ACTOR_TOP);  /* head above the art */
     }
+    if (dlg_on)
+        draw_dialog(r, ox, oy, zoom);
 }
 
-/* placeholder sprite pass: the party + NPCs.  NPC frame tables are
- * decoded from sprite.asm in stage 3 (the sprite sweep guard); the
- * stage-2 guards mask sprite cells, so a faithful frame table lands
- * with verify_engine_sprites. */
+/* NPCSpriteTbl @f846 (field_data.asm), pinned by tools/ff4_palette_truth.py:
+ * 8 frames x 4 OAM entries (x, y, tile, attr); frames = facing*2+step.
+ * NOTE: y offsets 1/9 - the OAM row shift is part of the table. */
+static const uint8_t npc_sprite_tbl[8][4][4] = {
+    { {0x00, 0x01, 0x04, 0x2C}, {0x00, 0x09, 0x06, 0x2C}, {0x08, 0x01, 0x05, 0x2C}, {0x08, 0x09, 0x07, 0x2C} },
+    { {0x00, 0x01, 0x04, 0x2C}, {0x00, 0x09, 0x07, 0x6C}, {0x08, 0x01, 0x05, 0x2C}, {0x08, 0x09, 0x06, 0x6C} },
+    { {0x00, 0x01, 0x09, 0x6C}, {0x00, 0x09, 0x0B, 0x6C}, {0x08, 0x01, 0x08, 0x6C}, {0x08, 0x09, 0x0A, 0x6C} },
+    { {0x00, 0x00, 0x0D, 0x6C}, {0x00, 0x08, 0x0F, 0x6C}, {0x08, 0x00, 0x0C, 0x6C}, {0x08, 0x08, 0x0E, 0x6C} },
+    { {0x00, 0x01, 0x00, 0x2C}, {0x00, 0x09, 0x02, 0x2C}, {0x08, 0x01, 0x01, 0x2C}, {0x08, 0x09, 0x03, 0x2C} },
+    { {0x00, 0x01, 0x00, 0x2C}, {0x00, 0x09, 0x03, 0x6C}, {0x08, 0x01, 0x01, 0x2C}, {0x08, 0x09, 0x02, 0x6C} },
+    { {0x00, 0x01, 0x08, 0x2C}, {0x00, 0x09, 0x0A, 0x2C}, {0x08, 0x01, 0x09, 0x2C}, {0x08, 0x09, 0x0B, 0x2C} },
+    { {0x00, 0x00, 0x0C, 0x2C}, {0x00, 0x08, 0x0E, 0x2C}, {0x08, 0x00, 0x0D, 0x2C}, {0x08, 0x08, 0x0F, 0x2C} },
+};
 static void npc_draw_one(SDL_Renderer *r, int i, int ox, int oy)
 {
     char p[512];
@@ -1675,63 +1752,272 @@ static void npc_draw_one(SDL_Renderer *r, int i, int ox, int oy)
                  sm_npc[i].sheet);
         free(sh);
         sh = read_file(p, &shlen);
-        snprintf(p, sizeof p, "data/gfx/gfx/npcPalettes[%d].bin",
-                 sm_npc[i].pal);
-        { uint8_t *d = read_file(p, NULL);
+        { const uint8_t *sp = read_file("data/gfx/pal/map_sprite_pal.bin",
+                                        NULL);
+          /* N.B. leaks the buffer per NPC; bounded by the NPC count and
+           * only on sheet/palette change - fix with a shared cache later */
+          static const uint8_t *cached = NULL;
 
-          if (d) { memcpy(npal, d, 32); free(d); } }
+
+          if (cached != sp) free(cached), cached = sp;
+          if (cached && sm_npc[i].pal * 16 + 16 <= 576) {
+              int k;
+
+              for (k = 0; k < 8; ++k) {
+                  unsigned w = (unsigned)cached[sm_npc[i].pal * 16 + k * 2] |
+                               ((unsigned)cached[sm_npc[i].pal * 16 +
+                                               k * 2 + 1] << 8);
+
+                  npal[k][0] = (uint8_t)(((w & 0x1F) << 3) | ((w >> 2) & 7));
+                  npal[k][1] = (uint8_t)((((w >> 5) & 0x1F) << 3) |
+                                         ((w >> 7) & 7));
+                  npal[k][2] = (uint8_t)((((w >> 10) & 0x1F) << 3) |
+                                         ((w >> 12) & 7));
+              }
+          } }
         cur_sheet = sm_npc[i].sheet;
         cur_pal = sm_npc[i].pal;
     }
-    if (!sh || shlen < 8 * 64)
-        return;
-    /* the NPC sheets hold one 16x16 facing (4 tiles) per frame pair in
-     * tile order 0..3 / 4..7; side facings reuse the same art until
-     * the exact NPC tile tables land (stage 3) */
+        if (!sh || shlen < 4 * 64) {
+        if (trace)
+            printf("[npc] %d sheet %d too short (%lu)\n", i,
+                   sm_npc[i].sheet, (unsigned long)shlen);
+        return;                 /* a pose needs 4 tiles; the per-entry
+                                 * bounds check skips art beyond the sheet */
+    }
+    /* NPCSpriteTbl (field_data.asm @f846, pinned by tools/
+     * ff4_palette_truth.py): 4 OAM entries per frame with per-entry x/y
+     * offsets - note y = 1/9, the row shift the guard's reference
+     * already includes.  Attr bit 6 = horizontal flip. */
+
     for (k = 0; k < 4; ++k) {
-        int t = (frame & 1) * 4 + k;
-        const uint8_t *art = sh + (size_t)t * 64;
+        int ex = npc_sprite_tbl[frame][k][0];
+        int ey = npc_sprite_tbl[frame][k][1];
+        int tile = npc_sprite_tbl[frame][k][2];
+        int attr = npc_sprite_tbl[frame][k][3];
+        const uint8_t *art = sh + (size_t)tile * 64;
         int x, y;
+
+        if ((size_t)tile * 64 + 64 > shlen)
+            continue;           /* short sheet: entry beyond the art */
+
 
         for (y = 0; y < 8; ++y)
             for (x = 0; x < 8; ++x) {
-                int ci = art[y * 8 + x];
+                int sxx = (attr & 0x40) ? 7 - x : x;
+                int ci = art[y * 8 + sxx];
 
                 if (!ci)
                     continue;
                 SDL_SetRenderDrawColor(r, npal[ci][0], npal[ci][1],
                                        npal[ci][2], 0xFF);
                 SDL_RenderFillRect(r, &(SDL_Rect){
-                    ox + (int)((sm_npc[i].x * 16 + (k % 2) * 8 - cam_x) * zoom),
-                    oy + (int)((sm_npc[i].y * 16 + (k / 2) * 8 - cam_y) * zoom),
+                    ox + (int)((sm_npc[i].x * 16 + ex + x - cam_x) * zoom),
+                    oy + (int)((sm_npc[i].y * 16 + ey + y - cam_y) * zoom),
                     (int)(zoom + 0.5), (int)(zoom + 0.5) });
             }
     }
 }
 
-static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy)
-{
-    int i;
+/* the actor's z mode on its cell (DrawPlayerSub @b2d6 + the @b284 split),
+ * the emulator-verified lane-aware rule:
+ *   hide iff (byte2 & 0x04) && !(byte1 & 0x04) && !((byte1 & 3) & lane)
+ *   (a bridge cell, byte1 & 0x04, is always visible)
+ *   split iff byte2 & 0x08 (top pair high OAM priority, bottom low)
+ * returns 0 = hidden, 1 = whole sprite under the front tiles,
+ * 2 = split (feet under, head above).  FF4_NOBRIDGESPLIT pins 1. */
+static int sm_actor_split = 0;      /* the head is pending above the front */
 
-    for (i = 0; i < sm_npc_count; ++i)
-        npc_draw_one(r, i, ox, oy);
-    if (sm_actor_visible())
-        draw_actor(r,
-                   ox + (int)(((int)ax - cam_x - 8) * zoom),
-                   oy + (int)(((int)ay - cam_y - 8) * zoom), zoom);
-}
-
-/* hide rule for the actor's own cell: props2 & 0x04 (DrawPlayerSub @b2d6
- * moves the OAM entries off-screen); refined z rules land with the
- * bridge guard in stage 3 */
-static int sm_actor_visible(void)
+static int sm_actor_zmode(int cx, int cy)
 {
-    int cx = (int)ax / 16, cy = (int)ay / 16;
+    int b1, b2, split;
 
     if (cx < 0 || cy < 0 || cx > 31 || cy > 31)
         return 1;
-    return !(sm_props[(cy * 32 + cx) * 2 + 1] & 0x04);
+    b1 = sm_props[(cy * 32 + cx) * 2];
+    b2 = sm_props[(cy * 32 + cx) * 2 + 1];
+    split = (b2 & 0x08) && !getenv("FF4_NOBRIDGESPLIT");
+    if (!(b2 & 0x04))
+        return split ? 2 : 1;
+    if (b1 & 0x04)
+        return split ? 2 : 1;        /* a bridge: always visible */
+    return ((b1 & 3) & player_z) ? (split ? 2 : 1) : 0;
 }
+
+static void sm_actor_blit(SDL_Renderer *r, int ox, int oy, int half)
+{
+    draw_actor_half(r,
+                    ox + (int)(((int)ax - cam_x - 8) * zoom),
+                    oy + (int)(((int)ay - cam_y - 8) * zoom), zoom, half);
+}
+
+static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy)
+{
+    int i;
+    int zm = sm_actor_zmode((int)ax / 16, (int)ay / 16);
+
+    sm_actor_split = 0;
+    for (i = 0; i < sm_npc_count; ++i)
+        if (!sm_npc[i].empty)
+            npc_draw_one(r, i, ox, oy);
+    if (zm == 0)
+        return;                     /* hidden (lane-aware hide rule) */
+    if (zm == 2) {
+        sm_actor_blit(r, ox, oy, ACTOR_BOTTOM);   /* feet under the edge */
+        sm_actor_split = 1;
+    } else {
+        sm_actor_blit(r, ox, oy, ACTOR_WHOLE);
+    }
+}
+
+
+/* ------------------- message box (FF4_DIALOG) ---------------------- */
+/* The box + glyphs are the WindowGfx bank (data/gfx/window, generated
+ * from ROM 0x57000/0x687D0): 256 2bpp tiles, 16-colour BGR555
+ * palette.  Geometry is locked in include/ff4/core/ff4_dialog_layout.h
+ * (measured on a real snes9x frame - do not change).  The decoded text
+ * byte IS the tile number (DecodeDlgText @b21f), so glyph tile ==
+ * ff4_ascii_to_code[ch].  Top-left, on top, SNES 256x224 space only. */
+static uint8_t *dlg_gfx, *dlg_pal;
+
+static void dlg_load(void)
+{
+    if (dlg_gfx)
+        return;
+    dlg_gfx = read_file("data/gfx/window/window_gfx.bin", NULL);
+    dlg_pal = read_file("data/gfx/window/window_pal.bin", NULL);
+}
+
+static void dlg_tile(SDL_Renderer *r, int tile, int x, int y,
+                     int ox, int oy, double z)
+{
+    const uint8_t *g;
+    int py, px;
+
+    if (!dlg_gfx || !dlg_pal || tile < 0 || tile > 255)
+        return;
+    g = dlg_gfx + (size_t)tile * 16;
+    for (py = 0; py < 8; ++py) {
+        unsigned p0 = g[py * 2], p1 = g[py * 2 + 1];
+
+        for (px = 0; px < 8; ++px) {
+            int ci = (int)(((p0 >> (7 - px)) & 1) |
+                           (((p1 >> (7 - px)) & 1) << 1));
+            unsigned w, rr, gg, bb;
+
+            if (!ci)
+                continue;
+            w = (unsigned)dlg_pal[ci * 2] | ((unsigned)dlg_pal[ci * 2 + 1] << 8);
+            rr = ((w & 0x1F) << 3) | ((w >> 2) & 7);
+            gg = (((w >> 5) & 0x1F) << 3) | ((w >> 7) & 7);
+            bb = (((w >> 10) & 0x1F) << 3) | ((w >> 12) & 7);
+            SDL_SetRenderDrawColor(r, rr, gg, bb, 0xFF);
+            SDL_RenderFillRect(r, &(SDL_Rect){
+                ox + (int)((x + px) * z), oy + (int)((y + py) * z),
+                (int)(z + 0.5), (int)(z + 0.5) });
+        }
+    }
+}
+
+static void draw_dialog(SDL_Renderer *r, int ox, int oy, double z)
+{
+    int row, col;
+
+    if (!dlg_on || !dlg_gfx)
+        return;
+    /* the box: top / body / bottom strips (TfrDlgWindow @b75f) */
+    dlg_tile(r, FF4_DLG_TILE_TL, FF4_DLG_X, FF4_DLG_TOP_Y, ox, oy, z);
+    for (col = 1; col < FF4_DLG_W / 8 - 1; ++col)
+        dlg_tile(r, FF4_DLG_TILE_TOP, FF4_DLG_X + col * 8,
+                 FF4_DLG_TOP_Y, ox, oy, z);
+    dlg_tile(r, FF4_DLG_TILE_TR, FF4_DLG_X + (FF4_DLG_W / 8 - 1) * 8,
+             FF4_DLG_TOP_Y, ox, oy, z);
+    for (row = 1; row <= FF4_DLG_BODY_ROWS; ++row) {
+        dlg_tile(r, FF4_DLG_TILE_L, FF4_DLG_X,
+                 FF4_DLG_TOP_Y + row * 8, ox, oy, z);
+        for (col = 1; col < FF4_DLG_W / 8 - 1; ++col)
+            dlg_tile(r, FF4_DLG_TILE_BODY, FF4_DLG_X + col * 8,
+                     FF4_DLG_TOP_Y + row * 8, ox, oy, z);
+        dlg_tile(r, FF4_DLG_TILE_R, FF4_DLG_X + (FF4_DLG_W / 8 - 1) * 8,
+                 FF4_DLG_TOP_Y + row * 8, ox, oy, z);
+    }
+    dlg_tile(r, FF4_DLG_TILE_BL, FF4_DLG_X,
+             FF4_DLG_TOP_Y + (FF4_DLG_ROWS - 1) * 8, ox, oy, z);
+    for (col = 1; col < FF4_DLG_W / 8 - 1; ++col)
+        dlg_tile(r, FF4_DLG_TILE_BOT, FF4_DLG_X + col * 8,
+                 FF4_DLG_TOP_Y + (FF4_DLG_ROWS - 1) * 8, ox, oy, z);
+    dlg_tile(r, FF4_DLG_TILE_BR, FF4_DLG_X + (FF4_DLG_W / 8 - 1) * 8,
+             FF4_DLG_TOP_Y + (FF4_DLG_ROWS - 1) * 8, ox, oy, z);
+
+    /* the text: glyph tile == ff4_ascii_to_code[ch]; \\charNN escapes
+     * become '?'; word-wrapped to 26 columns, line tops 27/43/59/75 */
+    {
+        char clean[400];
+        int m = 0, k;
+
+        for (k = 0; dlg_text[k] && m < (int)sizeof clean - 1; ++k) {
+            char ch = dlg_text[k];
+
+            if (ch == '\\') {
+                while (dlg_text[k] && isalnum((unsigned char)dlg_text[k]))
+                    ++k;
+                --k;
+                clean[m++] = '?';
+            } else if (ch == '\n') {
+                clean[m++] = ' ';
+            } else if ((unsigned char)ch >= 0x20 && (unsigned char)ch < 0x7F) {
+                clean[m++] = ch;
+            }
+        }
+        clean[m] = 0;
+        {   /* greedy word wrap onto the 4-line page */
+            char line[FF4_DLG_COLS + 1];
+            int llen = 0, nl = 0, j;
+
+            for (k = 0; clean[k] && nl < FF4_DLG_LINES; ++k) {
+                int wlen = 0;
+
+                while (clean[k + wlen] && clean[k + wlen] != ' ')
+                    ++wlen;
+                if (wlen >= FF4_DLG_COLS)
+                    wlen = FF4_DLG_COLS - 1;
+                if (llen && llen + wlen + 1 > FF4_DLG_COLS) {
+                    line[llen] = 0;
+                    for (j = 0; j < llen; ++j)
+                        dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
+                                 FF4_DLG_TEXT_X + j * 8,
+                                 FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
+                                 ox, oy, z);
+                    ++nl;
+                    llen = 0;
+                }
+                while (wlen-- > 0 && clean[k])
+                    line[llen++] = clean[k++];
+                if (llen && llen < FF4_DLG_COLS && clean[k] == ' ')
+                    line[llen++] = ' ';
+                if (llen >= FF4_DLG_COLS) {
+                    line[llen] = 0;
+                    for (j = 0; j < llen; ++j)
+                        dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
+                                 FF4_DLG_TEXT_X + j * 8,
+                                 FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
+                                 ox, oy, z);
+                    ++nl;
+                    llen = 0;
+                }
+            }
+            if (llen && nl < FF4_DLG_LINES) {
+                line[llen] = 0;
+                for (j = 0; j < llen; ++j)
+                    dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
+                             FF4_DLG_TEXT_X + j * 8,
+                             FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
+                             ox, oy, z);
+            }
+        }
+    }
+}
+
 
 /* ---------------------------- main -------------------------------- */
 
@@ -1768,6 +2054,10 @@ int main(int argc, char **argv)
         sm_noanim = 1;
     if ((e = getenv("FF4_NPCFREEZE")) && atoi(e))
         npc_frozen = 1;
+    if ((e = getenv("FF4_DIALOG")) && atoi(e)) {
+        dlg_on = 1;
+        dlg_load();
+    }
     if ((e = getenv("FF4_FACING")) && *e)
         facing = atoi(e) & 3;
     { const char *aw = getenv("FF4_AUTOWALK");
@@ -1809,7 +2099,7 @@ int main(int argc, char **argv)
         return 1;
     }
     load_sprite_slots();
-    sprite_load(sm_slot_sheet[0], sm_slot_pal[0]);
+    sprite_load(0, 0);      /* Cecil: sheet 0, MapSpritePal entry 0 */
     printf("[world] %s: %dx%d px (%dx%d cells), pack %s\n",
            W->name, W->idx_w, W->idx_h, W->cells, W->cells,
            wp_loaded ? "loaded" : "off");
@@ -1832,6 +2122,12 @@ int main(int argc, char **argv)
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 quit = 1;
+            else if (ev.type == SDL_KEYDOWN && ev.key.keysym.scancode <
+                     SDL_NUM_SCANCODES)
+                held[ev.key.keysym.scancode] = 1;
+            else if (ev.type == SDL_KEYUP && ev.key.keysym.scancode <
+                     SDL_NUM_SCANCODES)
+                held[ev.key.keysym.scancode] = 0;
             else if (ev.type == SDL_WINDOWEVENT &&
                      ev.window.event == SDL_WINDOWEVENT_RESIZED) {
                 win_w = ev.window.data1;
@@ -1874,7 +2170,7 @@ int main(int argc, char **argv)
             }
         }
 
-        keys = SDL_GetKeyboardState(NULL);
+        keys = held;
         if (!in_world) {
             /* sub-map movement: 1 px per frame, cell-gated by .walk */
             double dx = 0, dy = 0;
@@ -1904,7 +2200,14 @@ int main(int argc, char **argv)
                     ay += dy;
                     ++move_phase;
                     if ((int)ax / 16 != ocx || (int)ay / 16 != ocy) {
-                        int k = sm_trig_find((int)ax / 16, (int)ay / 16);
+                        int nc2 = (int)ay / 16 * 32 + (int)ax / 16;
+                        int k;
+
+                        /* $d2: the standing lane updates every step
+                         * except on bridge tiles (byte1 & 0x04) */
+                        if (!(sm_props[nc2 * 2] & 0x04))
+                            player_z = sm_props[nc2 * 2] & 3;
+                        k = sm_trig_find((int)ax / 16, (int)ay / 16);
 
                         if (k >= 0)
                             trigger_warp(sm_trig[k].map, sm_trig[k].dx,
