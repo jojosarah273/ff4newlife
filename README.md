@@ -1,97 +1,98 @@
-# FF4-C — Final Fantasy IV (SNES) C99 Source Port
+# FF4: New Life
 
-A modern, clean C99 reimplementation of Final Fantasy IV for the SNES.
-The engine executes the same game logic as the original 65C816 assembly —
-including its bugs — but with structured state, data-driven assets and an
-abstract platform layer, so identical logic runs on Linux, Windows, Android,
-Switch, 3DS or Dreamcast.
+A modern, portable re-implementation of **Final Fantasy IV** (SNES, 1991) —
+built from the original ROM's data and disassembly, verified against the
+real game at every step. The goal is a faithful engine that runs natively
+on desktop and Android, driven by the original assets.
 
-## Status
+> **Status:** the field scene is complete and byte-verified — world maps,
+> 383 sub-maps with layout groups, tile animation, warps, the message box,
+> NPC and actor sprites, and the bridge z-order, all pinned by an automated
+> 16-guard verification suite (plus a full 383-map sprite sweep:
+> **338/338 NPC sprites pixel-identical to the ROM reference, 0 mismatched**).
+> The event VM, battle and menu scenes are next (see `docs/TODO.md`).
 
-| Phase | Module | State |
-|-------|--------|-------|
-| 1 | Core types + RAM state (`include/ff4/core/*`, `src/core/ff4_state.c`) | ✅ Complete |
-| 2 | Asset loader (`include/ff4/engine/asset_db.h`, `src/engine/asset_db.c`) | ✅ Complete |
-| 3 | Core math & mechanics (`ff4_math.*`: RNG, damage, stats, statuses) | ✅ Complete |
-| 4 | Event script engine (`include/ff4/engine/event_engine.*`) | ✅ Complete |
-| 5 | Battle engine (`include/ff4/engine/battle_engine.*`: ATB, AI) | ✅ Complete |
-| 6 | Field map system (`include/ff4/engine/field_engine.*`) | ✅ Complete |
-| 7 | UI & menus (`include/ff4/engine/menu_engine.*`) | ✅ Complete |
-| 8 | Audio driver abstraction (`include/ff4/engine/audio_engine.*`) | ✅ Complete |
-| 9 | Platform host (SDL2 scene runtime) | ✅ Complete |
-| 10 | Actual game screens (title + prologue, ripped gfx as PNG) | ✅ Complete |
+## Why this exists
 
-## Repositories / data sources
+Most FF4 "ports" are emulators. This project instead asks: *can the game
+itself be rebuilt as portable C, with the original hardware behaviour —
+not an approximation?* Every rule in the engine is derived from the
+original 65816 assembly and checked against emulator ground truth:
 
-- `everything8215/ff4` — disassembly + rip tooling (`make rip` → `ff4-en-data.json`)
-- `aexoden/ff4-documentation` — RAM/ROM maps, data structures, formulas
-- Local clones live in `third_party/`; run once:
-  ```bash
-  cd third_party/ff4 && npm install && make rip   # needs vanilla/ff2.smc
-  ```
-- `data/ff4-en-data.json` is the ripped game database consumed by the engine.
+- **The emulator is the arbiter.** Anything both the exporter and the
+  engine agree on can still be wrong the same way — shared-convention
+  bugs are only visible against real hardware output (see
+  `docs/ACCOMPLISHED.md`, the "torch flip audit").
+- **A feature without a guard is not done; a guard that cannot fail is
+  not a guard.** `tools/verify_all.sh` runs the whole suite
+  (quick mode ≈ 1 min, full ≈ 35 min).
+- **Revert rather than ship unverified.**
 
-## Building
+## The architecture (docs/ARCHITECTURE.md)
 
-Requirements: a C99 compiler, CMake ≥ 3.16; SDL2 dev libs for the interactive
-backend (`libsdl2-dev`).
+One data layer shaped like the hardware, one renderer shaped like the
+hardware, no per-map special cases:
 
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure   # 9 suites, ~1100 checks
-./build/ff4_null                             # headless host
-./build/ff4_sdl                              # interactive demo (SDL2)
+```
+ROM → ff4-en-data.json ──► tools/ff4data.py ──► data/ packs
+      (rip: tables, layouts, props)              ├─ data/maps/<id>.ff4map
+                                                 │    cells + BG2 + groups
+                                                 ├─ data/world/<w>.ff4world
+                                                 └─ data/gfx/{sheets,anim,
+                                                      tileflags,palettes}
+engine: per-cell renderer = BG2 → BG1 non-front → sprites → BG1 front
+        (the priority passes of the real PPU order)
 ```
 
-The interactive build is the one to test:
+Highlights, all traced to the disassembly and measured on snes9x:
 
-- **Title**      boot shows the real FF4 title screen (ripped 4bpp art)
-- **Opening**    the game opens like a fresh run: Z at the title starts
-                the real event-16 intro (its own interpreter run): the
-                Red Wings flyover over the world map, the airship
-                scene, the Mysidia flashback, then the field - all
-                rendered live from the ripped maps/sprites/palettes
-- **Movement**   arrow keys (walk the Baron debug grid; green = passable)
-- **Menu**       Enter (navigate with arrows, Z = confirm, X = back)
-- **Battle**     B (auto-fight 3x Imp, victory -> field with exp/gil)
-- **Quit**       Q or Esc
+| Feature | Source of truth |
+|---|---|
+| Field tilesets, flags, palettes | `TILESET`/`PALETTE`/`TILEPROP` tables |
+| Tile animation (4 phases, 8-frame cadence) | `TfrBGAnimGfx @cb5f`, VRAM-verified |
+| Map layouts incl. underground/moon group | `DecodeSubTilemap @feba`, `$1701` |
+| Warps and cell triggers | `field/trigger.asm`, curtain at midpoint |
+| Actor sprite frames | `PlayerSpriteTiles @c0c4`, `DrawPlayerSub @b284` |
+| Bridge z-order (head above, feet behind) | OAM priority split, `byte2 & 0x08` |
+| Message box geometry | measured on a real snes9x frame |
+| World water/lava shimmer | `UpdateLavaPal @c4cd`, `LavaAnimPal` |
+| NPC sprites and palettes | `NPCSpriteTbl @f846`, `MapSpritePal` CGRAM slots |
 
-Graphics are extracted with the disassembly's own toolchain
-(`node tools/export_gfx.js` -> data/graphics/*.png using the rip data;
-the engine loads them via stb_image and blits through render_api).
-Field map data comes from the ripped tileset props; battle runs the real
-engine (ATB, auto-commands, CalcDmg, rewards).
+## Build and run
 
-## Design rules (see PROJECT_STRUCTURE.md)
+```sh
+cd build && cmake .. && make        # or: cmake --build build
+./tools/verify_all.sh quick         # the guard suite
 
-1. No register-emulation: assembly routines become state machines /
-   data-driven functions; `for`/`if`/`switch` only.
-2. No SNES hardware registers in core logic: `render_api.h` / `audio_api.h`
-   abstract PPU/SPC access.
-3. No hardcoded ROM offsets in logic: everything reads from the ripped JSON.
-4. Game state maps the SNES WRAM layout 1:1 in *semantic* form; offsets are
-   cited as comments, never used as indices.
-5. Explicit `<stdint.h>` types; idiomatic C99.
+./build/ff4_world                   # world view + sub-maps, interactive
+# useful knobs:
+FF4_WARPTO=<map>  FF4_MAPX=<cx> FF4_MAPY=<cy>   jump to a sub-map cell
+FF4_WORLD=0|1|2                     overworld / underground / moon
+FF4_SHOT=out.png FF4_SHOT_DELAY=25  bounded headless screenshot
+FF4_TRACE=1 FF4_AUTOWALK=down       headless traversal
+FF4_DIALOG=1                        the message box
+```
 
-## Documentation map (read before changing anything)
+Headless guard runs use `SDL_VIDEODRIVER=dummy`; every engine run in the
+tooling is bounded (timeout + screenshot + quit).
 
-| doc | contents |
-| --- | --- |
-| `docs/HANDOFF.md` | **start here** — goal, proven constants, processes, open items |
-| `docs/ARCHITECTURE.md` | layer model, the viewscape, tile-mapping pipeline, fidelity loop |
-| `docs/ENGINE.md` | world maps, tile decode, viewport, mods, milestones |
-| `docs/ROADMAP-field.md` | the field-scene roadmap + palette/layer references |
-| `docs/ROADMAP-warps.md` | the 82 entryways and the transition animation |
-| `docs/RESEARCH-collision.md` | passability bits, verified against the ROM |
-| `docs/RESEARCH-sprites-physics.md` | sprite tables, animation, movement |
-| `docs/FEASIBILITY-frameworks.md` | why C + SDL3 and not LÖVE/Lua |
+## Repository layout
 
-## Invariants
+```
+docs/        design notes, incident post-mortems, keystone inventory
+tools/       exporters + the guard suite (python, ROM-driven)
+src/         engine (SDL2 front-end; core split from platform)
+include/     core headers incl. the measured dialog geometry
+data/        the exported asset packs (derived from the ROM)
+tests/       unit tests (dialog geometry, collision masks, bundles)
+third_party/ reference disassembly (see its own notes)
+```
 
-* `ctest --test-dir build` must be **100 %** and the build must be
-  **warning-free**. `tests/test_world_rules.c` pins every sprite/physics
-  constant against the ROM — if it fails, the code is wrong, not the test.
-* **Measurements beat readings.** Never rewrite working code on the strength
-  of a new interpretation of the assembly; add the measurement first.
-* Every asset is regenerated by the tools in `tools/` — no hand-edited data.
+## Legal
+
+This project contains no ROM images and cannot run without a legally
+obtained *Final Fantasy IV* SNES ROM (place `ff2.smc` in the repository
+root — it is gitignored). Final Fantasy IV is © Square Enix; this is a
+non-commercial fan effort for study and preservation. The derived asset
+exports in `data/` are provided in the spirit of other decompilation and
+modding projects and will be withdrawn on request.
