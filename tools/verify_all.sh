@@ -36,6 +36,7 @@ TMO=300 run bridge_z         python3 tools/verify_bridge_z.py
 TMO=300 run world_tile_report python3 tools/verify_world_report.py
 
 if [ "${1:-}" != "quick" ]; then
+    TMO=60 run water_models     python3 tools/ff4_water_models.py --verify
     TMO=3600 run sprite_sweep    python3 tools/verify_all_maps.py 0 383
 else
     echo "(quick mode: skipping the full sprite sweep)"

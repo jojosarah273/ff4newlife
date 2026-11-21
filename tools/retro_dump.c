@@ -23,7 +23,9 @@ static const void *framebuf;
 static unsigned fb_w, fb_h;
 static enum retro_pixel_format fb_fmt;
 static int g_frame;
-static int g_press_start_at = -1;   /* pulse Start at this frame */
+static int g_press_start_at = -1;
+static int g_press_extra = -1;   /* FF4_PRESSBTN: extra/alternate button id */   /* pulse Start at this frame */
+static int g_press_to = -1;      /* FF4_PRESS_TO: stop the periodic presses here */
 static int g_press_start_len = 12;
 static int g_press_every = 0;
 static int g_verbose_input = 0;
@@ -125,9 +127,11 @@ static int16_t retro_input_state(unsigned port, unsigned device,
         (g_hold_len <= 0 || g_frame < g_hold_at + g_hold_len))
         return 1;
     if ((id == RETRO_DEVICE_ID_JOYPAD_START ||
-         id == RETRO_DEVICE_ID_JOYPAD_A) &&
+         id == RETRO_DEVICE_ID_JOYPAD_A ||
+         id == g_press_extra) &&
         ((g_press_start_at >= 0 &&
           g_frame >= g_press_start_at &&
+          (g_press_to < 0 || g_frame < g_press_to) &&
           g_frame < g_press_start_at + g_press_start_len) ||
          (g_press_every > 0 &&
           g_frame % g_press_every < g_press_start_len)))
@@ -373,6 +377,14 @@ int main(int argc, char **argv)
         g_press_every = atoi(argv[7]);
     if (argc > 8)
         g_verbose_input = atoi(argv[8]);
+    { const char *pb = getenv("FF4_PRESSBTN");
+
+      if (pb)
+          g_press_extra = atoi(pb); }
+    { const char *pt = getenv("FF4_PRESS_TO");
+
+      if (pt)
+          g_press_to = atoi(pt); }
     /* args: holdAt holdLen holdButton (5=down,4=up,6=left,7=right) */
     if (argc > 9)
         g_hold_at = atoi(argv[9]);
