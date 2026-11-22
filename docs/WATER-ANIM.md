@@ -109,17 +109,33 @@ lake.  Dense VRAM capture during the visible shimmer shows:
   No guard ever compared the world view to the emulator before, so this
   was invisible.
 
-### Remaining for the engine wiring (next session, clearly scoped)
+### Engine status: THE WATER MOVES (commit history: "world-water shimmer
+animated in the engine + the testable demo")
 
-1. Capture/derive the world's full 256-colour mode-7 palette (snes9x
-   CGRAM is not in the libretro memory map — derive from the emulator
-   screen + the anim art bytes, or find the ROM source the palette
-   uploader uses).
-2. The $2400 art -> screen pixel pipeline (the staged (byte,$00)
-   interleave reads as alternating art/colour-0 in mode 7 — verify
-   against the captured shots; the water flecks match the diagonal
-   one-pixel-per-phase drift visible in the staged phases).
-3. Then: which composed cells' base tiles map to the 8 animated slots
-   (mode-7 tile numbers 0x90-0x97), and render them from the phase art
-   in `wp_pass` — the guard compares the engine's per-phase view
-   against the captured shots.
+- The engine renders the 8 animated slots from the staged phases (packs
+  are FFW2: + 4 x 512 B), flecks over the emulator-verified static base,
+  8-frame cadence.  Guarded: `tools/verify_world_water.py` - the engine
+  equals the independently computed model merge at 0 px on all phases,
+  +8/+32 cadence, NOANIM pin.  `./demo.sh` shows it as an animated GIF.
+
+### Remaining (the honest gaps, ordered)
+
+1. **The underground's blue-lake palette.**  The captured underground
+   water displays colors ((8,89,198), (0,0,99), (206,215,222), ...) that
+   exist in NO 64-colour worldPalette table - the mode-7 CGRAM gets
+   them from somewhere not yet found (the ROM's `WorldPal_0000/1/2`
+   tables are the first 64 colours only; the palette buffer's upper
+   half is written by something else).  One targeted WRAM/CGRAM-trace
+   run will pin it; the underground's static water export then gets its
+   correct colors (today it renders the band in the lava-orange group).
+2. **The `$2400 -> screen` packing.**  The staged art is 4bpp-formatted
+   ((byte,$00) interleave) DMA'd into the mode-7 8bpp tile space - the
+   composer (TfrWorldTilemap) re-packs it for display.  The engine's
+   "nonzero flecks over the static base" reproduces the visual; the
+   byte-exact packing is the last step of the mode-7 chunk composer
+   (which is also the door to the dynamic world streaming - big enough
+   to be its own milestone).
+3. **The underground's animated band.**  The underground's composed
+   cells carry no base 0x80..0x87 - its water animates through a
+   different band mapping (likely 0x90..0x97 via the composer).  Pin
+   with one coastal WRAM trace after (1).

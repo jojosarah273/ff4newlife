@@ -5,11 +5,12 @@ built from the original ROM's data and disassembly, verified against the
 real game at every step. The goal is a faithful engine that runs natively
 on desktop and Android, driven by the original assets.
 
-> **Status:** the field scene is complete and byte-verified — world maps,
-> 383 sub-maps with layout groups, tile animation, warps, the message box,
-> NPC and actor sprites, and the bridge z-order, all pinned by an automated
-> 16-guard verification suite (plus a full 383-map sprite sweep:
-> **338/338 NPC sprites pixel-identical to the ROM reference, 0 mismatched**).
+> **Status:** the field scene is complete and byte-verified — world maps
+> (with the water shimmering exactly like the hardware), 383 sub-maps with
+> layout groups, tile animation, warps, the message box, NPC and actor
+> sprites, and the bridge z-order — pinned by a 19-guard verification
+> suite (plus a full 383-map sprite sweep: **338/338 NPC sprites
+> pixel-identical to the ROM reference, 0 mismatched**).
 > The event VM, battle and menu scenes are next (see `docs/TODO.md`).
 
 ## Why this exists
@@ -61,9 +62,13 @@ Highlights, all traced to the disassembly and measured on snes9x:
 ## Build and run
 
 ```sh
-cd build && cmake .. && make        # or: cmake --build build
+./demo.sh                           # build + the headless screenshot tour,
+                                    # incl. an animated GIF of the water
+./demo.sh --play                    # interactive: arrows move, V = tile
+                                    # reporter, T = whole map, 1/2/3 = worlds
 ./tools/verify_all.sh quick         # the guard suite
 
+cd build && cmake .. && make        # manual build
 ./build/ff4_world                   # world view + sub-maps, interactive
 # useful knobs:
 FF4_WARPTO=<map>  FF4_MAPX=<cx> FF4_MAPY=<cy>   jump to a sub-map cell
