@@ -34,9 +34,10 @@ TMO=400 run lava_palette     python3 tools/verify_lava_pal.py
 TMO=300 run layout_group     python3 tools/verify_layout_group.py
 TMO=300 run bridge_z         python3 tools/verify_bridge_z.py
 TMO=300 run world_tile_report python3 tools/verify_world_report.py
+TMO=60  run water_models     python3 tools/ff4_water_models.py --verify
+TMO=400 run world_water     python3 tools/verify_world_water.py
 
 if [ "${1:-}" != "quick" ]; then
-    TMO=60 run water_models     python3 tools/ff4_water_models.py --verify
     TMO=3600 run sprite_sweep    python3 tools/verify_all_maps.py 0 383
 else
     echo "(quick mode: skipping the full sprite sweep)"

@@ -56,6 +56,12 @@ static int player_z = 2;
 /* global frame counter: NPC idle animation uses this (the game uses $7a for
  * NPCs and $7b for the player, which is why they are not in sync) */
 static unsigned frame_counter;
+/* tile/water animation phase pins (shared by the sub-map tile anim and
+ * the world-water shimmer - both are the $7a 8-frame/phase cadence) */
+static int sm_phase_env = -1;            /* FF4_ANIMPHASE pins 0..3 */
+static int sm_noanim;                    /* FF4_NOANIM pins phase 0 */
+static int dlg_on;                       /* FF4_DIALOG */
+static char dlg_text[320];
 /* NPC palette search: H/J shift every NPC palette so the right one can be
  * found by eye; FF4_NPCPAL sets the starting shift. */
 /* Found in game by eye: the correct shift differs per map. Baron town is 13,
@@ -161,7 +167,8 @@ static uint8_t *wp_base;             /* 128*4 */
 static uint8_t *wp_assign;           /* 256 */
 static uint8_t *wp_gfx;              /* nart*64 art bytes (8bpp expanded) */
 static uint8_t *wp_pal;              /* 64*4 RGBA */
-static int wp_w, wp_h, wp_nart, wp_loaded;
+static uint8_t *wp_wateranim;       /* 4 phases x 512 B (FFW2) */
+static int wp_w, wp_h, wp_nart, wp_loaded, wp_has_wateranim;
 
 static void wp_free(void)
 {
@@ -170,6 +177,7 @@ static void wp_free(void)
     free(wp_assign); wp_assign = NULL;
     free(wp_gfx); wp_gfx = NULL;
     free(wp_pal); wp_pal = NULL;
+    free(wp_wateranim); wp_wateranim = NULL;
     wp_loaded = 0;
 }
 
@@ -187,10 +195,12 @@ static int wp_load(const char *name)
     f = fopen(path, "rb");
     if (!f)
         return -1;
-    if (fread(hdr, 1, 12, f) != 12 || memcmp(hdr, "FFW1", 4) != 0) {
+    if (fread(hdr, 1, 12, f) != 12 ||
+        (memcmp(hdr, "FFW1", 4) != 0 && memcmp(hdr, "FFW2", 4) != 0)) {
         fclose(f);
         return -1;
     }
+    wp_has_wateranim = (memcmp(hdr, "FFW2", 4) == 0);
     wp_w = hdr[4] | (hdr[5] << 8);
     wp_h = hdr[6] | (hdr[7] << 8);
     wp_nart = hdr[8] | (hdr[9] << 8);
@@ -200,7 +210,9 @@ static int wp_load(const char *name)
     wp_assign = (uint8_t *)malloc(256);
     wp_gfx = (uint8_t *)malloc((size_t)wp_nart * 64);
     wp_pal = (uint8_t *)malloc(64 * 4);
+    wp_wateranim = (uint8_t *)malloc(4 * 512);
     if (!wp_cells || !wp_base || !wp_assign || !wp_gfx || !wp_pal ||
+        !wp_wateranim ||
         fread(wp_cells, 1, n, f) != n ||
         fread(wp_base, 1, 512, f) != 512 ||
         fread(wp_assign, 1, 256, f) != 256 ||
@@ -210,8 +222,22 @@ static int wp_load(const char *name)
         wp_free();
         return -1;
     }
+    if (wp_has_wateranim) {
+        if (fread(wp_wateranim, 1, 4 * 512, f) != 4 * 512) {
+            fclose(f);
+            wp_free();
+            return -1;
+        }
+    } else {
+        memset(wp_wateranim, 0, 4 * 512);
+    }
     fclose(f);
     wp_loaded = 1;
+    if (getenv("FF4_TRACE"))
+        printf("[world] pack %s: wateranim %d, phase1 slot1 head %02x%02x\n",
+               wp_has_wateranim ? "FFW2" : "FFW1", wp_has_wateranim,
+               wp_wateranim ? wp_wateranim[512 + 64] : 0,
+               wp_wateranim ? wp_wateranim[512 + 65] : 0);
     return 0;
 }
 
@@ -439,10 +465,31 @@ static uint8_t *read_file(const char *path, size_t *len);
  * step 1) into an ARGB buffer - one pass, direct pixel writes.
  * Equivalent to compose_view()'s .idx/.pal path - byte-verified by
  * tools/ff4data.py --verify against the reference world PNGs. */
+/* TfrBGAnimGfx phase for the water: same $7a cadence as the sub-map
+ * tile animation (8 frames per phase, 4 phases), pinned by
+ * tools/ff4_water_models.py --verify against emulator VRAM captures */
+static int wp_water_phase(void)
+{
+    if (sm_noanim)
+        return 0;
+    if (sm_phase_env >= 0 && sm_phase_env <= 3)
+        return sm_phase_env;
+    return (frame_counter >> 3) & 3;
+}
+
+/* The world-water shimmer (TfrBGAnimGfx @cb5f): 8 animated tile slots
+ * hold the staged MapAnimGfx phases (byte-proven).  In the engine's
+ * palette space the slots carry the same band tiles (base 0x80..0x87):
+ * the phase art's nonzero bytes are the wave flecks (index + the
+ * tile's palette assign - the ocean blues group), its zero bytes fall
+ * back to the static export's art, which is emulator-verified as the
+ * correct base.  The staged art drifts one pixel per phase - the
+ * visible shimmer. */
 static void wp_pass(uint32_t *out, int ou, int ov)
 {
     int cx0 = (int)(cam_x / 16), cy0 = (int)(cam_y / 16);
     int cxx, cyy;
+    int wphase = wp_water_phase();
 
     if (!wp_loaded)
         return;
@@ -456,10 +503,15 @@ static void wp_pass(uint32_t *out, int ou, int ov)
                 int bt = wp_base[c * 4 + k];
                 int pb = wp_assign[bt];
                 const uint8_t *art = wp_gfx + (size_t)bt * 64;
+                const uint8_t *anim = NULL;
                 int ox = (cxx * 16 + (k % 2) * 8) - (int)cam_x;
                 int oy = (cyy * 16 + (k / 2) * 8) - (int)cam_y;
                 int y, x;
 
+                /* the animated slots: base 0x80..0x87 -> slot 0..7 */
+                if (bt >= 0x80 && bt <= 0x87)
+                    anim = wp_wateranim + wphase * 512 +
+                           (size_t)(bt - 0x80) * 64;
                 for (y = 0; y < 8; ++y) {
                     int sy = oy + y;
 
@@ -472,7 +524,10 @@ static void wp_pass(uint32_t *out, int ou, int ov)
 
                         if (sx < 0 || sx >= ou)
                             continue;
-                        ci = (art[y * 8 + x] + pb) % 64;
+                        ci = art[y * 8 + x];
+                        if (anim && anim[y * 8 + x])
+                            ci = anim[y * 8 + x];
+                        ci = (ci + pb) % 64;
                         cc = wp_pal + ci * 4;
                         out[(size_t)sy * ou + sx] =
                             0xFF000000u | ((uint32_t)cc[0] << 16) |
@@ -1119,12 +1174,9 @@ static int sm_actor_visible(void);
 static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy);
 static int sm_actor_split;               /* the head pending above the front */
 static void draw_dialog(SDL_Renderer *r, int ox, int oy, double z);
-static int dlg_on;
 static char dlg_text[320];
 static int sm_actor_zmode(int cx, int cy);
 static void sm_actor_blit(SDL_Renderer *r, int ox, int oy, int half);
-static int sm_phase_env = -1;            /* FF4_ANIMPHASE pins 0..3 */
-static int sm_noanim;                    /* FF4_NOANIM pins phase 0 */
 
 /* the cell program: per group, per cell, per sub-sprite */
 struct sm_prog {
@@ -2083,8 +2135,26 @@ int main(int argc, char **argv)
       if (wt && *wt)
           warp_to_map(atoi(wt)); }
 
+    /* startup diagnostics: the most common "failed to load" causes are
+     * a display server SDL cannot use, or data/ not resolvable from the
+     * working directory */
+    { char probe[512];
+
+      if (!ff4_resolve_path("data/world/overworld.ff4world",
+                            probe, sizeof probe)) {
+          fprintf(stderr,
+                  "ff4_world: data/ not found.\n"
+                  "  Run from the repository root (the directory that "
+                  "contains data/),\n"
+                  "  or set FF4_DATA_DIR=/path/to/repo.\n");
+          return 1;
+      } }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+        fprintf(stderr,
+                "  If there is no display, run headless instead:\n"
+                "    SDL_VIDEODRIVER=dummy FF4_SHOT=/tmp/world.png "
+                "FF4_SHOT_DELAY=25 ./build/ff4_world\n");
         return 1;
     }
     if (SDL_CreateWindowAndRenderer(WIN_DEFAULT_W, WIN_DEFAULT_H,

@@ -245,7 +245,29 @@ def emit_worlds(obj):
             lavapal = (out / "underground.lavapal").read_bytes()
         # the moon is 64x64 cells; over/underground 256x256
         w = h = 64 if nm == "moon" else 256
-        hdr = _st.pack("<4sHHHBB", b"FFW1", w, h, len(gfx) // 64,
+        # the world-water animation phases (TfrBGAnimGfx): the staged
+        # MapAnimGfx block, 8 tiles x 4 phases x 64 B (byte-proven vs
+        # emulator VRAM captures - tools/ff4_water_models.py --verify).
+        # NOTE: all three worlds stage the SAME MapAnimGfx block 0.
+        romf = open(ROOT / "ff2.smc", "rb").read()
+        if len(romf) == 0x100200:
+            romf = romf[0x200:]
+        staged = bytearray()
+        _x = 0
+        while len(staged) < 0x800:
+            for _i in range(16):
+                staged.append(romf[0xFB9C0 + _x]); _x += 1
+            for _i in range(8):
+                staged.append(romf[0xFB9C0 + _x]); _x += 1
+                staged.append(0)
+        staged = bytes(staged)
+        wateranim = bytearray()
+        for ph in range(4):
+            for i in range(4):
+                j = ((ph - 1) % 4 + 4 * i) * 0x80
+                wateranim += staged[j:j + 0x80]
+        wateranim = bytes(wateranim)
+        hdr = _st.pack("<4sHHHBB", b"FFW2", w, h, len(gfx) // 64,
                        len(pal) // 4, 1 if lavapal else 0)
         blob = bytearray(hdr)
         blob += cells
@@ -253,6 +275,7 @@ def emit_worlds(obj):
         blob += assign[:256]
         blob += gfx
         blob += pal
+        blob += wateranim
         blob += lavapal
         (out / f"{nm}.ff4world").write_bytes(blob)
         done += 1
