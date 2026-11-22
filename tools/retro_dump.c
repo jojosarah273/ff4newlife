@@ -24,7 +24,13 @@ static unsigned fb_w, fb_h;
 static enum retro_pixel_format fb_fmt;
 static int g_frame;
 static int g_press_start_at = -1;
-static int g_press_extra = -1;   /* FF4_PRESSBTN: extra/alternate button id */   /* pulse Start at this frame */
+static int g_press_extra = -1;   /* FF4_PRESSBTN: extra/alternate button id */
+/* FF4_ROUTE="frame:button:len,frame:button:len,...": held-button script
+ * (button = libretro id, 4=up 5=down 6=left 7=right, -1 = no button) */
+#define ROUTE_MAX 64
+static int g_route_at[ROUTE_MAX], g_route_btn[ROUTE_MAX], g_route_len[ROUTE_MAX];
+static int g_route_n;
+static int g_press_only = -1;   /* FF4_PRESSONLY: press just this button id */   /* pulse Start at this frame */
 static int g_press_to = -1;      /* FF4_PRESS_TO: stop the periodic presses here */
 static int g_press_start_len = 12;
 static int g_press_every = 0;
@@ -126,9 +132,20 @@ static int16_t retro_input_state(unsigned port, unsigned device,
         g_frame >= g_hold_at &&
         (g_hold_len <= 0 || g_frame < g_hold_at + g_hold_len))
         return 1;
-    if ((id == RETRO_DEVICE_ID_JOYPAD_START ||
-         id == RETRO_DEVICE_ID_JOYPAD_A ||
-         id == g_press_extra) &&
+    /* the route script: one segment holds one button */
+    { int i;
+
+      for (i = 0; i < g_route_n; ++i)
+          if (g_route_btn[i] >= 0 && id == g_route_btn[i] &&
+              g_frame >= g_route_at[i] &&
+              g_frame < g_route_at[i] + g_route_len[i])
+              return 1;
+    }
+    if ((g_press_only >= 0
+         ? id == g_press_only
+         : (id == RETRO_DEVICE_ID_JOYPAD_START ||
+            id == RETRO_DEVICE_ID_JOYPAD_A ||
+            id == g_press_extra)) &&
         ((g_press_start_at >= 0 &&
           g_frame >= g_press_start_at &&
           (g_press_to < 0 || g_frame < g_press_to) &&
@@ -367,6 +384,30 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* FF4_SRM=path: load a battery save into the core's SAVE RAM right
+     * after boot (the frontend's job in libretro) */
+    { const char *srmp = getenv("FF4_SRM");
+
+      if (srmp && r_mem) {
+          void *sram = (void *)r_mem(RETRO_MEMORY_SAVE_RAM);
+          FILE *sf = fopen(srmp, "rb");
+
+          if (sram && sf) {
+              long n;
+
+              fseek(sf, 0, SEEK_END);
+              n = ftell(sf);
+              fseek(sf, 0, SEEK_SET);
+              if (fread(sram, 1, (size_t)n, sf) == (size_t)n)
+                  fprintf(stderr, "[srm] %ld bytes into save ram\n", n);
+              else
+                  fprintf(stderr, "[srm] short read\n");
+              fclose(sf);
+          } else {
+              fprintf(stderr, "[srm] no save ram or file missing\n");
+          }
+      } }
+
     frames = atoi(argv[4]);
     every = argc > 5 ? atoi(argv[5]) : 1;
     crc_init();
@@ -385,6 +426,30 @@ int main(int argc, char **argv)
 
       if (pt)
           g_press_to = atoi(pt); }
+    { const char *po = getenv("FF4_PRESSONLY");
+
+      if (po)
+          g_press_only = atoi(po); }
+    { const char *rt = getenv("FF4_ROUTE");
+
+      if (rt) {
+          const char *c = rt;
+
+          while (*c && g_route_n < ROUTE_MAX) {
+              g_route_at[g_route_n] = (int)strtol(c, (char **)&c, 10);
+              if (*c != ':')
+                  break;
+              ++c;
+              g_route_btn[g_route_n] = (int)strtol(c, (char **)&c, 10);
+              if (*c != ':')
+                  break;
+              ++c;
+              g_route_len[g_route_n] = (int)strtol(c, (char **)&c, 10);
+              ++g_route_n;
+              while (*c == ',' || *c == ' ')
+                  ++c;
+          }
+      } }
     /* args: holdAt holdLen holdButton (5=down,4=up,6=left,7=right) */
     if (argc > 9)
         g_hold_at = atoi(argv[9]);

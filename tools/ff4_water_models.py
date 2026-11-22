@@ -125,30 +125,112 @@ def ocean_y_step(buf, k):
 
 
 def main(argv):
-    # the exact replay with phase 1, like the proof run
-    files = sorted(glob.glob(str(ROOT / "data/field/cavewater_capture"
-                                          "/w_*.bin")))
+    root = Path(__file__).resolve().parent.parent
+    fails = []
+
+    # cave water: replay the pinned WRAM capture byte-exactly
+    files = sorted(glob.glob(str(root / "data/field/cavewater_capture"
+                                       "/w_*.bin")))
     frames = {int(f.split("_")[-1].split(".")[0]): open(f, "rb").read()
               for f in files}
     frs = sorted(frames)
     buf = bytearray(frames[frs[0]][:256])
-    c = 0
     ok = 0
-    k = 1                                    # the captured run's phase
+    k = 1
     for i, fr in enumerate(frs[1:], 1):
-        cave_step(buf, k, c)
+        cave_step(buf, k, 0)
         k = (k + 1) & 0xF
-        real = bytearray(frames[fr][:256])
-        if buf == real:
+        if buf == bytearray(frames[fr][:256]):
             ok += 1
         else:
-            print(f"  divergence at frame {fr} (step {i})")
+            print(f"  cave divergence at frame {fr} (step {i})")
             break
     print(f"cave-water model: {ok}/{len(frs) - 1} capture steps "
           f"reproduced byte-exactly")
-    if "--verify" in argv:
-        return 0 if ok == len(frs) - 1 else 1
+    if ok != len(frs) - 1:
+        fails.append("cave-water replay")
+
+    # world water: the staged->VRAM phase mapping vs the pinned captures
+    if not verify_world_water(root):
+        fails.append("world-water phase model")
+
+    if fails:
+        print("FAILURES: " + ", ".join(fails))
+        return 1
     return 0
+
+
+# --------------------------------------------------------------------------
+# WORLD WATER (UpdateWaterAnim/TfrWaterGfx) and the REAL shimmer
+# --------------------------------------------------------------------------
+# In-game capture (battery save, snes9x, dense VRAM): the VISIBLE ocean
+# shimmer is TfrBGAnimGfx writing VRAM word $1200 (byte $2400-$25ff, 8
+# mode-7 tile slots) every 8 frames - NOT the WRAM windows.  The phase
+# mapping is proven byte-exact against
+# data/field/worldwater_capture/vram_{4002,4010,4018,4026}.bin:
+#
+#   phase p's 512 bytes = staged blocks (p-1)%4, +4, +8, +12
+#   i.e. b''.join(staged[((p-1)%4)+4*i : ((p-1)%4)+4*i+0x80] for i in 0..3)
+#
+# staged = LoadBGAnimGfx staging of MapAnimGfx block 0 (ROM $fb9c0):
+#   per 32 bytes: 16 raw bytes, then 8 x (raw byte, $00)
+# (TfrBGAnimGfx @cb5f: phase = ($7a & 0x18) >> 3; DMA 4 x $80 to word
+#  $1200; on world maps it runs unconditionally, in sub-maps gated on
+#  $7a & $06 - WaitFrame @914b calls it in EVERY world mode.)
+
+WSX = [0x00, 0x88, 0x10, 0x98, 0x20, 0xA8, 0x30, 0xB8,
+       0x80, 0x08, 0x90, 0x18, 0xA0, 0x28, 0xB0, 0x38]
+WSY = [0x00, 0x41, 0x02, 0x43, 0x04, 0x45, 0x06, 0x47,
+       0x40, 0x01, 0x42, 0x03, 0x44, 0x05, 0x46, 0x07]
+
+
+def stage_map_anim_gfx(rom, block=0):
+    """LoadBGAnimGfx @cb01: stage MapAnimGfx block to the $7f:5000 form."""
+    mag = 0xFB9C0 + block * 384
+    out = bytearray()
+    x = 0
+    while len(out) < 0x800:
+        for _ in range(16):
+            out.append(rom[mag + x])
+            x += 1
+        for _ in range(8):
+            out.append(rom[mag + x])
+            x += 1
+            out.append(0)
+    return bytes(out)
+
+
+def world_water_phase_bytes(staged, p):
+    """The 512 bytes TfrBGAnimGfx DMAs to VRAM word $1200 at phase p.
+
+    Phase p takes staged BLOCKS (indices) (p-1)%4, +4, +8, +12 - each
+    block is 0x80 bytes: b''.join over block j = ((p-1)%4 + 4*i).
+    """
+    blocks = [((p - 1) % 4 + 4 * i) for i in range(4)]
+    return b''.join(staged[j * 0x80:j * 0x80 + 0x80] for j in blocks)
+
+
+def verify_world_water(root):
+    """Byte-prove the phase model against the pinned VRAM captures."""
+    rom = open(root / "ff2.smc", "rb").read()
+    if len(rom) == 0x100200:
+        rom = rom[0x200:]
+    staged = stage_map_anim_gfx(rom, 0)
+    cap_dir = root / "data/field/worldwater_capture"
+    frames = [4002, 4010, 4018, 4026]
+    ok = 0
+    for i, fr in enumerate(frames):
+        d = open(cap_dir / f"vram_{fr}.bin", "rb").read()
+        for p in range(4):
+            if world_water_phase_bytes(staged, p) == d[0x2400:0x2600]:
+                ok += 1
+                print(f"  vram {fr} == world-water phase {p}")
+                break
+        else:
+            print(f"  vram {fr}: NO phase match")
+    print(f"world water phase model: {ok}/{len(frames)} VRAM captures "
+          f"reproduced byte-exactly")
+    return ok == len(frames)
 
 
 if __name__ == "__main__":

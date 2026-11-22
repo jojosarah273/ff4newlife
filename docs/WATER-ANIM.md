@@ -82,3 +82,44 @@ shore without wandering into Baron.
   loop (windows load but stay static), and the periodic presses open
   the menu on the field (pausing the anim) — stop them with
   `FF4_PRESS_TO` before sampling.
+
+
+## Update (this session): the REAL world shimmer, byte-proven
+
+A battery save (FF4_SRM) + precise menu taps ("300:8:5,500:5:5,700:8:5")
+gets the emulator into a saved game standing before a big underground
+lake.  Dense VRAM capture during the visible shimmer shows:
+
+- **The visible world water animation is `TfrBGAnimGfx`** (the standard
+  4-phase system), writing the 8 mode-7 tile slots at VRAM word $1200
+  (byte $2400-$25ff) every 8 frames — NOT the `UpdateWaterAnim` WRAM
+  windows (those load at field init and stay static in-game).
+- `WaitFrame @914b` calls `TfrBGAnimGfx` in EVERY world mode; on world
+  maps it runs unconditionally (sub-maps gate on `$7a & $06`).
+- **Phase mapping proven byte-exact** against
+  `data/field/worldwater_capture/vram_{4002,4010,4018,4026}.bin`:
+  phase p's 512 bytes = staged blocks (p-1)%4, +4, +8, +12 (0x80 each)
+  of the `LoadBGAnimGfx` staging of `MapAnimGfx` block 0 (ROM $fb9c0).
+  Guarded by `tools/ff4_water_models.py --verify` (4/4 phases exact).
+- **Data gap found**: the underground's blue water renders with colors
+  OUTSIDE the rip's 64-colour `worldPalettes` — the mode-7 world uses a
+  256-colour palette, and the water blues (e.g. (8,89,198), (0,0,99))
+  live in the extended range.  The static `.idx` export renders
+  underground 0x19 as lava-orange; the emulator shows animated blue.
+  No guard ever compared the world view to the emulator before, so this
+  was invisible.
+
+### Remaining for the engine wiring (next session, clearly scoped)
+
+1. Capture/derive the world's full 256-colour mode-7 palette (snes9x
+   CGRAM is not in the libretro memory map — derive from the emulator
+   screen + the anim art bytes, or find the ROM source the palette
+   uploader uses).
+2. The $2400 art -> screen pixel pipeline (the staged (byte,$00)
+   interleave reads as alternating art/colour-0 in mode 7 — verify
+   against the captured shots; the water flecks match the diagonal
+   one-pixel-per-phase drift visible in the staged phases).
+3. Then: which composed cells' base tiles map to the 8 animated slots
+   (mode-7 tile numbers 0x90-0x97), and render them from the phase art
+   in `wp_pass` — the guard compares the engine's per-phase view
+   against the captured shots.
