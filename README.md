@@ -8,10 +8,15 @@ on desktop and Android, driven by the original assets.
 > **Status:** the field scene is complete and byte-verified — world maps
 > (with the water shimmering exactly like the hardware), 383 sub-maps with
 > layout groups, tile animation, warps, the message box, NPC and actor
-> sprites, and the bridge z-order — pinned by a 19-guard verification
+> sprites, and the bridge z-order — pinned by a 21-guard verification
 > suite (plus a full 383-map sprite sweep: **338/338 NPC sprites
 > pixel-identical to the ROM reference, 0 mismatched**).
-> The event VM, battle and menu scenes are next (see `docs/TODO.md`).
+>
+> **Now playable:** walk the ROM-faithful maps, talk to townsfolk (their
+> real lines), open chests (real items), trigger on-enter event scripts
+> through the verified event VM, use the real menu engine, and save/load.
+> See `docs/AUDIT.md` for the structural audit and the next steps
+> (battle rendering, NPC behaviour, the core/platform split).
 
 ## Why this exists
 
@@ -62,10 +67,12 @@ Highlights, all traced to the disassembly and measured on snes9x:
 ## Build and run
 
 ```sh
-./demo.sh                           # build + the headless screenshot tour,
-                                    # incl. an animated GIF of the water
-./demo.sh --play                    # interactive: arrows move, V = tile
-                                    # reporter, T = whole map, 1/2/3 = worlds
+./demo.sh                           # build + the headless tour: the water
+                                    # GIF, talk, chest, event script, menu,
+                                    # save
+./demo.sh --play                    # interactive: arrows walk, Z talk /
+                                    # confirm, X cancel, Enter menu,
+                                    # F5 save, F9 load, 1/2/3 worlds
 ./tools/verify_all.sh quick         # the guard suite
 
 cd build && cmake .. && make        # manual build

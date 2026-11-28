@@ -133,11 +133,65 @@ def main():
         print("  07 underground: FAILED")
         missing.append("underground")
 
+    # ---- the playable tour: talk, chest, event script, menu, save ----
+    def play(name, keys, extra=None, delay=60):
+        env = dict(os.environ)
+        env.update({"SDL_VIDEODRIVER": "dummy", "FF4_ZOOM": "1.0",
+                    "FF4_NPCFREEZE": "1", "FF4_KEYS": keys,
+                    "FF4_SHOT": str(OUT / name),
+                    "FF4_SHOT_DELAY": str(delay)})
+        if extra:
+            for k, v in extra.items():
+                if v is None:
+                    env.pop(k, None)
+                else:
+                    env[k] = v
+        subprocess.run(["timeout", "60", str(EXE)], env=env,
+                       capture_output=True, timeout=90)
+        return (OUT / name) if (OUT / name).exists() else None
+
+    # 08: talk to Baron's townsfolk (Z on the NPC you stand on)
+    p = play("08_talk.png", "10:29:2",
+             {"FF4_WARPTO": "0", "FF4_MAPX": "14", "FF4_MAPY": "16"})
+    print("  08 talk:", "ok" if p else "FAILED")
+
+    # 09: open the chest (face it, press Z) - real item from the ROM
+    p = play("09_chest.png", "10:29:2",
+             {"FF4_WARPTO": "0", "FF4_MAPX": "8", "FF4_MAPY": "3",
+              "FF4_FACING": "0", "FF4_NOCLIP": None})
+    print("  09 chest:", "ok" if p else "FAILED")
+
+    # 10: an on-enter event script (map 100's cell runs eventScript[1])
+    p = play("10_event.png", "10:81:40", {"FF4_WARPTO": "100",
+                                          "FF4_MAPX": "4",
+                                          "FF4_MAPY": "4",
+                                          "FF4_NOCLIP": "1"}, delay=90)
+    print("  10 event script:", "ok" if p else "FAILED")
+
+    # 11: the main menu with the real party
+    p = play("11_menu.png", "10:40:2",
+             {"FF4_WARPTO": "0", "FF4_MAPX": "14", "FF4_MAPY": "16"})
+    print("  11 menu:", "ok" if p else "FAILED")
+
+    # 12: a save/load round-trip proof (the log)
+    sav = "/tmp/ff4demo/tour.sav"
+    env = dict(os.environ)
+    env.update({"SDL_VIDEODRIVER": "dummy", "FF4_WARPTO": "0",
+                "FF4_MAPX": "14", "FF4_MAPY": "16", "FF4_SAVE": sav,
+                "FF4_KEYS": "10:81:20,40:62:2", "FF4_SHOT":
+                str(OUT / "12_save.png"), "FF4_SHOT_DELAY": "70"})
+    r = subprocess.run(["timeout", "60", str(EXE)], env=env,
+                       capture_output=True, text=True, timeout=90)
+    line = [l for l in (r.stdout + r.stderr).splitlines() if "[save]" in l]
+    print("  12 save:", line[0] if line else "FAILED")
+
     if missing:
         print("\nFAILED:", ", ".join(missing))
         return 1
     print(f"\nall demo shots in {OUT} - open 02_world_anim.gif to watch "
           "the water move")
+    print("playable: ./demo.sh --play  (arrows, Z talk/confirm, X cancel, "
+          "Enter menu, F5 save, F9 load)")
     return 0
 
 

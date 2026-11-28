@@ -46,6 +46,37 @@ static const char *jstr(cJSON *item, const char *def)
 }
 
 /* Bounds-checking array accessor used for *every* array read. */
+/* A map-dialog entry is an ARRAY of lines (the rip stores each map's
+ * lines as a list); joining them with newlines is what the field's
+ * dialog window expects.  Reading such a node with jstr() returned ""
+ * for all 384 maps - the audit caught an empty dialogue table. */
+static void jstr_join(char *out, size_t cap, cJSON *item)
+{
+    size_t used = 0;
+
+    out[0] = 0;
+    if (!item)
+        return;
+    if (cJSON_IsString(item)) {
+        snprintf(out, cap, "%s", item->valuestring);
+        return;
+    }
+    if (!cJSON_IsArray(item))
+        return;
+    {
+        int i, n = cJSON_GetArraySize(item);
+
+        for (i = 0; i < n && used + 1 < cap; ++i) {
+            const char *line = jstr(cJSON_GetArrayItem(item, i), "");
+
+            if (!*line)
+                continue;
+            used += (size_t)snprintf(out + used, cap - used, "%s%s",
+                                     used ? "\n" : "", line);
+        }
+    }
+}
+
 static cJSON *jarr(cJSON *arr, int idx)
 {
     if (!arr || !cJSON_IsArray(arr))
@@ -894,8 +925,8 @@ static void load_shop_and_text(FF4_AssetDB *db, cJSON *obj)
         }
 
     for (i = 0; i < 384; ++i)
-        snprintf(db->map_dialog[i], sizeof db->map_dialog[i], "%s",
-                 jstr(jarr(mapdlg, i), ""));
+        jstr_join(db->map_dialog[i], sizeof db->map_dialog[i],
+                  jarr(mapdlg, i));
     for (i = 0; i < 512; ++i) {
         snprintf(db->event_dialog1[i], sizeof db->event_dialog1[i], "%s",
                  jstr(jarr(evt1, i), ""));

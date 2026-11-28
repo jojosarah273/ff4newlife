@@ -36,6 +36,15 @@
 #include "ff4/core/ff4_dialog_layout.h"
 #include "ff4/platform/app_paths.h"
 
+/* the game stack: FF4_GameState + the asset DB + the menu engine.
+ * These are the ff4_core engine modules the guarded tests already
+ * validate (test_events/test_menu/test_field/test_scene); the playable
+ * demo wires them to the ROM-faithful renderer. */
+#include "ff4/core/ff4_state.h"
+#include "ff4/engine/asset_db.h"
+#include "ff4/engine/menu_engine.h"
+#include "ff4/engine/event_engine.h"
+
 #define WIN_DEFAULT_W 1024
 #define WIN_DEFAULT_H 768
 /* runtime window size (the window is resizable, and fullscreen changes it) */
@@ -60,8 +69,39 @@ static unsigned frame_counter;
  * the world-water shimmer - both are the $7a 8-frame/phase cadence) */
 static int sm_phase_env = -1;            /* FF4_ANIMPHASE pins 0..3 */
 static int sm_noanim;                    /* FF4_NOANIM pins phase 0 */
-static int dlg_on;                       /* FF4_DIALOG */
-static char dlg_text[320];
+static int dlg_on;                       /* a message box is on screen */
+static char dlg_text[1024];
+
+/* ---- message pages: word-wrapped lines, 4 per page ---- */
+static char dlg_page[16][FF4_DLG_LINES][FF4_DLG_COLS + 1];
+static int dlg_npages = 1, dlg_curpage;
+
+/* ---- the game stack (new game: Cecil + Kain, as the prologue) ---- */
+static FF4_AssetDB pdb;
+static FF4_GameState pg;
+static FF4_MenuCtx pmenu;
+static int game_ready;
+static int menu_open;
+static int msgbox_active;                /* dialog is paged & closable */
+static int talk_cooldown;                /* frames before A retriggers */
+
+/* FF4_KEYS="frame:scancode:len,..." scripted input for tests/demos
+ * (scancodes: 79 right 80 left 81 down 82 up 29 z 27 esc 20 q
+ *  40 enter 22 s 4 a ... - SDL2 values) */
+#define KEYS_SCRIPT_MAX 64
+static struct { int at, code, len; } keys_script[KEYS_SCRIPT_MAX];
+static int keys_script_n;
+
+/* ---- the event VM (ff4_event_*, validated by test_events) ---- */
+static void game_sync_position(void);
+static void chest_open(int cx, int cy, int xdest, int ydest);
+static void event_start(int id);
+static void event_pump(void);
+static void event_dialog_closed(void);
+static FF4_EventRun erun;
+static int erun_active;
+static int erun_wait_dialog;      /* blocked on the message box */
+static int erun_skipped;          /* actions we cannot render yet */
 /* NPC palette search: H/J shift every NPC palette so the right one can be
  * found by eye; FF4_NPCPAL sets the starting shift. */
 /* Found in game by eye: the correct shift differs per map. Baron town is 13,
@@ -1174,7 +1214,7 @@ static int sm_actor_visible(void);
 static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy);
 static int sm_actor_split;               /* the head pending above the front */
 static void draw_dialog(SDL_Renderer *r, int ox, int oy, double z);
-static char dlg_text[320];
+static void draw_menu(SDL_Renderer *r, int ox, int oy, double z);
 static int sm_actor_zmode(int cx, int cy);
 static void sm_actor_blit(SDL_Renderer *r, int ox, int oy, int half);
 
@@ -1500,6 +1540,15 @@ static void trigger_warp(int map, int x, int y, int dir, int event)
     tw_pending.y = y;
     tw_pending.dir = dir;
     tw_pending.event = event;
+    /* an event script drives the trigger when one is named: it can show
+     * dialogue, move the party, set flags, then warp itself.  The direct
+     * warp stays for scripts without one (and as the fallback). */
+    if (event != 0 && game_ready && !getenv("FF4_NOEVENTS")) {
+        warp_frames_cur = 32;
+        event_start(event);
+        if (erun_active)
+            return;
+    }
     warp_frames_cur = 32;                 /* the curtain */
     if (trace)
         printf("[trig] event %d -> %d at (%d,%d) dir %d (curtain)\n",
@@ -1773,6 +1822,8 @@ static void draw_submap_view(SDL_Renderer *r)
     }
     if (dlg_on)
         draw_dialog(r, ox, oy, zoom);
+    if (menu_open)
+        draw_menu(r, ox, oy, zoom);
 }
 
 /* NPCSpriteTbl @f846 (field_data.asm), pinned by tools/ff4_palette_truth.py:
@@ -1923,6 +1974,593 @@ static void sm_draw_sprites(SDL_Renderer *r, int ox, int oy)
 }
 
 
+/* ================================================================== */
+/*  THE PLAYABLE LAYER (the audit's convergence: real renderer +       */
+/*  the ff4_core game stack)                                          */
+/*                                                                    */
+/*  world_view.c has the ROM-verified field rendering, warps, NPCs    */
+/*  and the message box.  ff4_core has the verified game state, the   */
+/*  asset DB and the menu engine (test_events / test_menu / test_field*/
+/*  pass).  This layer joins them: one party, one inventory, one      */
+/*  menu, talkable NPCs, and a scripted-input hook so the whole thing */
+/*  is testable headless.                                             */
+/* ================================================================== */
+
+static void game_init(void)
+{
+    char p[512];
+
+    snprintf(p, sizeof p, "data/ff4-en-data.json");
+    if (!ff4_resolve_path(p, p, sizeof p)) {
+        fprintf(stderr, "[game] data/ff4-en-data.json missing - "
+                        "menus unavailable\n");
+        return;
+    }
+    /* the FULL loader (items, monsters, dialogue, event scripts...);
+     * ff4_db_load_rip only reads the character table - the audit found
+     * the playable layer was running with an almost empty DB */
+    if (ff4_db_load(&pdb, p) != 0) {
+        fprintf(stderr, "[game] asset DB load failed: %s\n", pdb.error);
+        return;
+    }
+    ff4_state_init(&pg);
+
+    /* the prologue party (Baron castle): Cecil and Kain */
+    ff4_party_add(&pg, FF4_CHAR_CECIL_DK, 0);
+    ff4_party_add(&pg, FF4_CHAR_KAIN_1, 1);
+    pg.inventory.gil = 300;            /* the prologue purse ($16A0) */
+    ff4_inventory_add(&pg.inventory, 1, 3);   /* a few potions */
+    ff4_inventory_add(&pg.inventory, 2, 1);
+    menu_open = 0;
+    game_ready = 1;
+    printf("[game] dialog: map0=\"%.40s\" item221=\"%s\"\n",
+           pdb.map_dialog[0], ff4_item_name(&pdb, 221));
+    printf("[game] party %d+%d, gil %u, items %u\n",
+           pg.party[0].id, pg.party[1].id, (unsigned)pg.inventory.gil,
+           (unsigned)ff4_inventory_count(&pg.inventory));
+}
+
+/* mirror the walking position into the game state (menus/saves read it) */
+static void game_sync_position(void)
+{
+    if (!game_ready)
+        return;
+    if (in_world) {
+        pg.world.map_type = FF4_MAP_OVERWORLD;
+        pg.world.world = (FF4_World)cur;
+        pg.world.map_id = 0;
+    } else {
+        pg.world.map_type = FF4_MAP_SUB;
+        pg.world.map_id = (uint8_t)sm_map;
+    }
+    pg.world.x = (uint16_t)((int)ax / 16);
+    pg.world.y = (uint16_t)((int)ay / 16);
+    pg.world.facing = (FF4_Direction)(facing & 3);
+}
+
+/* ---- text pages ---------------------------------------------------- */
+
+/* clean \\charNN escapes, word-wrap into 26-column lines, 4 per page */
+static void dlg_set_text(const char *src)
+{
+    char clean[1024];
+    int m = 0, k, llen = 0, nlines = 0;
+
+    for (k = 0; src[k] && m < (int)sizeof clean - 1; ++k) {
+        char ch = src[k];
+
+        if (ch == '\\') {
+            while (src[k + 1] && isalnum((unsigned char)src[k + 1]))
+                ++k;
+            clean[m++] = '?';
+        } else if (ch == '\n') {
+            clean[m++] = ' ';
+        } else if ((unsigned char)ch >= 0x20 && (unsigned char)ch < 0x7F) {
+            clean[m++] = ch;
+        }
+    }
+    clean[m] = 0;
+
+    dlg_npages = 0;
+    dlg_curpage = 0;
+    memset(dlg_page, 0, sizeof dlg_page);
+    for (k = 0; clean[k] && dlg_npages < 16; ) {
+        int wlen = 0;
+
+        while (clean[k + wlen] && clean[k + wlen] != ' ')
+            ++wlen;
+        if (wlen > FF4_DLG_COLS)
+            wlen = FF4_DLG_COLS;
+        if (llen && llen + wlen + 1 > FF4_DLG_COLS) {
+            dlg_page[dlg_npages][nlines][llen] = 0;
+            if (++nlines >= FF4_DLG_LINES) {
+                ++dlg_npages;
+                nlines = 0;
+                if (dlg_npages >= 16)
+                    break;
+            }
+            llen = 0;
+        }
+        while (wlen-- > 0 && clean[k] && llen < FF4_DLG_COLS)
+            dlg_page[dlg_npages][nlines][llen++] = clean[k++];
+        if (llen && llen < FF4_DLG_COLS && clean[k] == ' ')
+            dlg_page[dlg_npages][nlines][llen++] = clean[k++];
+    }
+    if (llen)
+        dlg_page[dlg_npages][nlines][llen] = 0;
+    dlg_npages = dlg_npages + 1;
+    if (dlg_npages > 16)
+        dlg_npages = 16;
+    dlg_page[dlg_npages - 1][FF4_DLG_LINES - 1][FF4_DLG_COLS] = 0;
+    msgbox_active = 1;
+    dlg_on = 1;
+    /* NOTE: never snprintf(dlg_text, ..., dlg_text) - overlapping
+     * src/dst is UB and glibc returned an empty string (the event
+     * dialogue printed blank).  Callers own dlg_text. */
+}
+
+/* ---- talk ---------------------------------------------------------- */
+
+/* the NPC the party leader is facing (then the one on its own cell) */
+static int sm_npc_facing(void)
+{
+    int cx = (int)ax / 16, cy = (int)ay / 16;
+    int tx = cx, ty = cy;
+    int i;
+
+    switch (facing & 3) {
+    case 0: --ty; break;              /* up */
+    case 1: ++tx; break;              /* right */
+    case 2: ++ty; break;              /* down */
+    default: --tx; break;             /* left */
+    }
+    for (i = 0; i < sm_npc_count; ++i) {
+        if (sm_npc[i].empty)
+            continue;
+        if (sm_npc[i].x == tx && sm_npc[i].y == ty)
+            return i;
+    }
+    for (i = 0; i < sm_npc_count; ++i) {
+        if (sm_npc[i].empty)
+            continue;
+        if (sm_npc[i].x == cx && sm_npc[i].y == cy)
+            return i;
+    }
+    return -1;
+}
+
+static void talk_try(void)
+{
+    int n;
+    int tx = (int)ax / 16, ty = (int)ay / 16;
+
+    if (in_world || talk_cooldown > 0)
+        return;
+    /* chests are on wall cells: face one and press Z (the real game's
+     * rule - a chest record with map 0xFE on the faced cell) */
+    switch (facing & 3) {
+    case 0: --ty; break;
+    case 1: ++tx; break;
+    case 2: ++ty; break;
+    default: --tx; break;
+    }
+    if (tx >= 0 && ty >= 0 && tx < 32 && ty < 32) {
+        int k = sm_trig_find(tx, ty);
+
+        if (k >= 0 && sm_trig[k].map == 0xFE) {
+            chest_open(tx, ty, sm_trig[k].dx, sm_trig[k].dy);
+            talk_cooldown = 10;
+            return;
+        }
+    }
+    n = sm_npc_facing();
+    if (n < 0 || !sm_npc[n].text[0]) {
+        printf("[talk] nobody to talk to\n");
+        return;
+    }
+    printf("[talk] npc %d at (%d,%d): %.60s\n", n, sm_npc[n].x,
+           sm_npc[n].y, sm_npc[n].text);
+    snprintf(dlg_text, sizeof dlg_text, "%s", sm_npc[n].text);
+    dlg_set_text(dlg_text);
+    talk_cooldown = 10;
+}
+
+/* ---- the menu ------------------------------------------------------ */
+
+static void menu_try_open(void)
+{
+    if (!game_ready || menu_open)
+        return;
+    game_sync_position();
+    ff4_menu_open(&pdb, &pg, &pmenu, FF4_MENU_MAIN);
+    menu_open = 1;
+    printf("[menu] open (main)\n");
+}
+
+static void menu_feed(FF4_MenuInput in)
+{
+    FF4_MenuResult r;
+
+    if (!menu_open)
+        return;
+    r = ff4_menu_input(&pdb, &pg, &pmenu, in);
+    /* the engine's res.done means "selection taken"; the menu is closed
+     * only when the context itself closes (X on Main / the Exit row) */
+    if (!pmenu.open) {
+        menu_open = 0;
+        printf("[menu] closed\n");
+    } else {
+        printf("[menu] screen %d cursor %d\n", (int)pmenu.screen,
+               pmenu.list.cursor);
+    }
+}
+
+/* ---- save / load (a modern amenity; the format is ours, versioned) -- */
+/* "FF4S" + u8 version, then the playable slice of FF4_GameState:
+ * world position, gold, party (id/level/hp/mp/exp), inventory.  The map
+ * is reloaded on load, so a save resumes in the same room. */
+
+#define FF4_SAVE_MAGIC "FF4S"
+#define FF4_SAVE_VER   1
+
+static const char *save_path(void)
+{
+    static char p[512];
+    const char *e = getenv("FF4_SAVE");
+
+    if (e && *e)
+        return e;
+    if (!ff4_resolve_path("data", p, sizeof p))
+        return "ff4save.dat";
+    /* the repo root: put the save next to data/ */
+    {
+        size_t n = strlen(p);
+
+        if (n > 5) {
+            p[n - 5] = 0;              /* strip "/data" */
+            snprintf(p + strlen(p), sizeof p - strlen(p), "/ff4save.dat");
+        }
+    }
+    return p;
+}
+
+static int game_save(void)
+{
+    FILE *f;
+    const char *path = save_path();
+    uint8_t buf[8];
+    int i;
+
+    if (!game_ready)
+        return -1;
+    game_sync_position();
+    f = fopen(path, "wb");
+    if (!f) {
+        fprintf(stderr, "[save] cannot write %s\n", path);
+        return -1;
+    }
+    memcpy(buf, FF4_SAVE_MAGIC, 4);
+    buf[4] = FF4_SAVE_VER;
+    buf[5] = (uint8_t)pg.world.map_type;
+    buf[6] = (uint8_t)pg.world.world;
+    buf[7] = pg.world.map_id;
+    fwrite(buf, 1, 8, f);
+    fwrite(&pg.world.x, 2, 1, f);
+    fwrite(&pg.world.y, 2, 1, f);
+    fwrite(&pg.world.facing, 1, 1, f);
+    fwrite(&pg.inventory.gil, 2, 1, f);
+    for (i = 0; i < FF4_PARTY_MAX; ++i) {
+        const FF4_PartyMember *m = &pg.party[i];
+        uint8_t rec[12];
+
+        rec[0] = m->id; rec[1] = m->level;
+        rec[2] = (uint8_t)(m->hp & 0xFF); rec[3] = (uint8_t)(m->hp >> 8);
+        rec[4] = (uint8_t)(m->max_hp & 0xFF); rec[5] = (uint8_t)(m->max_hp >> 8);
+        rec[6] = (uint8_t)(m->mp & 0xFF); rec[7] = (uint8_t)(m->mp >> 8);
+        rec[8] = (uint8_t)(m->max_mp & 0xFF); rec[9] = (uint8_t)(m->max_mp >> 8);
+        rec[10] = (uint8_t)(m->exp & 0xFF);
+        rec[11] = (uint8_t)(m->exp >> 8);
+        fwrite(rec, 1, 12, f);
+    }
+    fwrite(&pg.inventory.count, 1, 1, f);
+    fwrite(pg.inventory.slots, sizeof pg.inventory.slots[0],
+           FF4_INVENTORY_SLOTS, f);
+    fclose(f);
+    printf("[save] wrote %s (map %d at %d,%d)\n", path, (int)pg.world.map_id,
+           (int)pg.world.x, (int)pg.world.y);
+    return 0;
+}
+
+static int game_load(void)
+{
+    FILE *f;
+    const char *path = save_path();
+    uint8_t buf[8];
+    uint16_t x, y, gil;
+    uint8_t facing, cnt;
+    int i;
+
+    f = fopen(path, "rb");
+    if (!f)
+        return -1;
+    if (fread(buf, 1, 8, f) != 8 || memcmp(buf, FF4_SAVE_MAGIC, 4) != 0 ||
+        buf[4] != FF4_SAVE_VER) {
+        fclose(f);
+        fprintf(stderr, "[load] %s: bad header\n", path);
+        return -1;
+    }
+    fread(&x, 2, 1, f);
+    fread(&y, 2, 1, f);
+    fread(&facing, 1, 1, f);
+    fread(&gil, 2, 1, f);
+    pg.world.map_type = (FF4_MapType)buf[5];
+    pg.world.world = (FF4_World)buf[6];
+    pg.world.map_id = buf[7];
+    pg.world.x = x;
+    pg.world.y = y;
+    pg.world.facing = (FF4_Direction)(facing & 3);
+    pg.inventory.gil = gil;
+    for (i = 0; i < FF4_PARTY_MAX; ++i) {
+        uint8_t rec[12];
+        FF4_PartyMember *m = &pg.party[i];
+
+        if (fread(rec, 1, 12, f) != 12)
+            break;
+        m->id = rec[0];
+        m->level = rec[1];
+        m->hp = (uint16_t)(rec[2] | (rec[3] << 8));
+        m->max_hp = (uint16_t)(rec[4] | (rec[5] << 8));
+        m->mp = (uint16_t)(rec[6] | (rec[7] << 8));
+        m->max_mp = (uint16_t)(rec[8] | (rec[9] << 8));
+        m->exp = (uint32_t)(rec[10] | (rec[11] << 8));
+    }
+    if (fread(&cnt, 1, 1, f) == 1) {
+        pg.inventory.count = cnt;
+        fread(pg.inventory.slots, sizeof pg.inventory.slots[0],
+              FF4_INVENTORY_SLOTS, f);
+    }
+    fclose(f);
+
+    /* resume in the saved place */
+    if (buf[5] == FF4_MAP_SUB && submap_load(buf[7], 0) == 0) {
+        ax = x * 16 + 8;
+        ay = y * 16 + 8;
+        facing = facing & 3;
+        update_camera_sm();
+    } else if (buf[5] == FF4_MAP_OVERWORLD && load_world(buf[6]) == 0) {
+        ax = x * 16 + 8;
+        ay = y * 16 + 8;
+        facing = facing & 3;
+        update_camera();
+    }
+    printf("[load] %s: map %d at %d,%d, gil %u\n", path, (int)pg.world.map_id,
+           (int)pg.world.x, (int)pg.world.y, (unsigned)pg.inventory.gil);
+    return 0;
+}
+
+/* ---- scripted input (tests/demo) ---------------------------------- */
+
+static void keys_script_parse(const char *spec)
+{
+    const char *c = spec;
+
+    while (*c && keys_script_n < KEYS_SCRIPT_MAX) {
+        keys_script[keys_script_n].at = (int)strtol(c, (char **)&c, 10);
+        if (*c != ':')
+            break;
+        ++c;
+        keys_script[keys_script_n].code = (int)strtol(c, (char **)&c, 10);
+        if (*c != ':')
+            break;
+        ++c;
+        keys_script[keys_script_n].len = (int)strtol(c, (char **)&c, 10);
+        ++keys_script_n;
+        while (*c == ',' || *c == ' ')
+            ++c;
+    }
+}
+
+/* Inject the script as real SDL key events at their start/end frames:
+ * the whole input path (actions, menu, dialog, held state) is the same
+ * as a human's, so a scripted run exercises the real code. */
+static void keys_script_pump(void)
+{
+    int i;
+
+    for (i = 0; i < keys_script_n; ++i) {
+        SDL_Event ev;
+
+        if ((int)frame_counter != keys_script[i].at &&
+            (int)frame_counter != keys_script[i].at + keys_script[i].len)
+            continue;
+        if (keys_script[i].code < 0 || keys_script[i].code >= SDL_NUM_SCANCODES)
+            continue;
+        SDL_zero(ev);
+        ev.type = ((int)frame_counter == keys_script[i].at)
+                      ? SDL_KEYDOWN : SDL_KEYUP;
+        ev.key.type = ev.type;
+        ev.key.keysym.scancode = (SDL_Scancode)keys_script[i].code;
+        ev.key.keysym.sym = SDL_GetKeyFromScancode(
+            (SDL_Scancode)keys_script[i].code);
+        ev.key.state = (ev.type == SDL_KEYDOWN) ? SDL_PRESSED : SDL_RELEASED;
+        SDL_PushEvent(&ev);
+    }
+}
+
+static void keys_script_apply(Uint8 *keys)
+{
+    int i;
+
+    for (i = 0; i < keys_script_n; ++i)
+        if ((int)frame_counter >= keys_script[i].at &&
+            (int)frame_counter < keys_script[i].at + keys_script[i].len &&
+            keys_script[i].code >= 0 && keys_script[i].code < SDL_NUM_SCANCODES)
+            keys[keys_script[i].code] = 1;
+}
+
+/* ---- chests (trigger records with map == 0xFE) -------------------- */
+/* Record: x, y, 0xFE, xDest, yDest.  xDest bit 0x80 = "gives item"
+ * (item id = yDest); otherwise it is a gil amount (trigger.asm @999b).
+ * Opened chests are remembered per cell so they do not repeat. */
+static uint8_t chest_opened[1024 / 8];
+
+static int chest_is_open(int cx, int cy)
+{
+    int bit = cy * 32 + cx;
+
+    return (chest_opened[bit >> 3] >> (bit & 7)) & 1;
+}
+
+static void chest_mark_open(int cx, int cy)
+{
+    int bit = cy * 32 + cx;
+
+    chest_opened[bit >> 3] |= (uint8_t)(1u << (bit & 7));
+}
+
+static void chest_open(int cx, int cy, int xdest, int ydest)
+{
+    char msg[96];
+
+    if (chest_is_open(cx, cy))
+        return;
+    chest_mark_open(cx, cy);
+    if (game_ready && (xdest & 0x80)) {
+        int item = ydest & 0xFF;
+
+        ff4_inventory_add(&pg.inventory, (FF4_ItemId)item, 1);
+        snprintf(msg, sizeof msg, "Obtained the %s!",
+                 ff4_item_name(&pdb, (uint8_t)item));
+        printf("[chest] map cell (%d,%d): item %d (%s)\n", cx, cy, item,
+               ff4_item_name(&pdb, (uint8_t)item));
+    } else {
+        unsigned gil = (unsigned)(xdest & 0x7F) * 10u;
+
+        if (game_ready)
+            pg.inventory.gil = (uint16_t)(pg.inventory.gil + gil);
+        snprintf(msg, sizeof msg, "Obtained %u gil!", gil);
+        printf("[chest] map cell (%d,%d): %u gil\n", cx, cy, gil);
+    }
+    dlg_set_text(msg);
+}
+
+/* ---- event scripts on the field ---------------------------------- */
+/* A tile trigger names an event id; the script lives in the asset DB as
+ * eventScript[<id>] and runs on the verified interpreter.  Actions the
+ * renderer cannot show yet (battle, shop, cinema) are logged and
+ * acknowledged so the script continues - the same policy the framework
+ * demo used.  Dialogue blocks on the message box; closing it acks. */
+
+static void event_start(int id)
+{
+    char key[32];
+    const FF4_Blob *b;
+
+    if (!game_ready) {
+        printf("[event] %d skipped (no asset db)\n", id);
+        return;
+    }
+    snprintf(key, sizeof key, "eventScript[%d]", id);
+    b = ff4_db_blob(&pdb, key);
+    if (!b || !b->len) {
+        printf("[event] %d: no script data\n", id);
+        return;
+    }
+    ff4_event_run_begin(&erun, &pg, &pdb, b->data, b->len);
+    erun_active = 1;
+    erun_wait_dialog = 0;
+    printf("[event] %d start (%zu bytes)\n", id, (size_t)b->len);
+}
+
+static void event_pump(void)
+{
+    int steps;
+
+    if (!erun_active)
+        return;
+    if (erun_wait_dialog)
+        return;
+    for (steps = 0; steps < 200 && erun_active; ++steps) {
+        FF4_EventAction a = ff4_event_step(&erun);
+
+        if (erun.state == FF4_EVENT_DONE) {
+            erun_active = 0;
+            printf("[event] done\n");
+            break;
+        }
+        if (a.kind == FF4_EVT_ACT_NONE)
+            break;
+        switch (a.kind) {
+        case FF4_EVT_ACT_DIALOGUE:
+            game_sync_position();
+            snprintf(dlg_text, sizeof dlg_text, "%s", a.text ? a.text : "");
+            dlg_set_text(dlg_text);
+            erun_wait_dialog = 1;
+            printf("[event] dialogue(kind %d param %d): \"%.60s\"\n",
+                   (int)a.kind, a.param, a.text ? a.text : "(null)");
+            return;
+        case FF4_EVT_ACT_MOVE: {
+            /* move the party leader (obj 0) on the field grid */
+            int cx = (int)ax / 16, cy = (int)ay / 16;
+
+            if (a.obj == 0) {
+                if (a.act >= 0 && a.act < 4)
+                    facing = a.act;
+                else {
+                    int nx = cx, ny = cy;
+                    switch (facing & 3) {
+                    case 0: --ny; break;
+                    case 1: ++nx; break;
+                    case 2: ++ny; break;
+                    default: --nx; break;
+                    }
+                    if (noclip || (nx >= 0 && ny >= 0 && nx < 32 && ny < 32 &&
+                                   sm_walk[ny * 32 + nx])) {
+                        ax = nx * 16 + 8;
+                        ay = ny * 16 + 8;
+                        update_camera_sm();
+                    }
+                }
+            }
+            break;
+        }
+        case FF4_EVT_ACT_BATTLE:
+            printf("[event] battle %d (renderer pending; skipped)\n", a.param);
+            ++erun_skipped;
+            ff4_event_ack(&erun);
+            break;
+        case FF4_EVT_ACT_SHOP:
+        case FF4_EVT_ACT_INN:
+        case FF4_EVT_ACT_CINEMATIC:
+        case FF4_EVT_ACT_SCREEN:
+        case FF4_EVT_ACT_NAMINGWAY:
+        case FF4_EVT_ACT_BIG_CHOCOBO:
+            printf("[event] action %d param %d (renderer pending)\n",
+                   (int)a.kind, a.param);
+            ++erun_skipped;
+            ff4_event_ack(&erun);
+            break;
+        case FF4_EVT_ACT_SONG:
+        case FF4_EVT_ACT_SFX:
+            printf("[event] sound %d\n", a.param);
+            break;
+        default:
+            break;
+        }
+        if (erun.state == FF4_EVENT_BLOCKED)
+            break;
+    }
+}
+
+/* when the message box closes, release a dialogue-blocked event */
+static void event_dialog_closed(void)
+{
+    if (erun_wait_dialog) {
+        erun_wait_dialog = 0;
+        ff4_event_ack(&erun);
+    }
+}
+
 /* ------------------- message box (FF4_DIALOG) ---------------------- */
 /* The box + glyphs are the WindowGfx bank (data/gfx/window, generated
  * from ROM 0x57000/0x687D0): 256 2bpp tiles, 16-colour BGR555
@@ -2001,75 +2639,125 @@ static void draw_dialog(SDL_Renderer *r, int ox, int oy, double z)
     dlg_tile(r, FF4_DLG_TILE_BR, FF4_DLG_X + (FF4_DLG_W / 8 - 1) * 8,
              FF4_DLG_TOP_Y + (FF4_DLG_ROWS - 1) * 8, ox, oy, z);
 
-    /* the text: glyph tile == ff4_ascii_to_code[ch]; \\charNN escapes
-     * become '?'; word-wrapped to 26 columns, line tops 27/43/59/75 */
+    /* the text: the current page's lines (word-wrapped into 26-column
+     * rows by dlg_set_text; glyph tile == ff4_ascii_to_code[ch]) */
     {
-        char clean[400];
-        int m = 0, k;
+        int line, col;
 
-        for (k = 0; dlg_text[k] && m < (int)sizeof clean - 1; ++k) {
-            char ch = dlg_text[k];
+        for (line = 0; line < FF4_DLG_LINES; ++line) {
+            const char *t = dlg_page[dlg_curpage][line];
 
-            if (ch == '\\') {
-                while (dlg_text[k] && isalnum((unsigned char)dlg_text[k]))
-                    ++k;
-                --k;
-                clean[m++] = '?';
-            } else if (ch == '\n') {
-                clean[m++] = ' ';
-            } else if ((unsigned char)ch >= 0x20 && (unsigned char)ch < 0x7F) {
-                clean[m++] = ch;
+            for (col = 0; t[col] && col < FF4_DLG_COLS; ++col) {
+                int code;
+
+                if ((unsigned char)t[col] < 0x20 ||
+                    (unsigned char)t[col] >= 0x7F)
+                    continue;
+                code = ff4_ascii_to_code[(int)t[col] - 0x20];
+                if (code == 0xFF)
+                    continue;
+                dlg_tile(r, code, FF4_DLG_TEXT_X + col * 8,
+                         FF4_DLG_TEXT_Y0 + line * FF4_DLG_TEXT_PITCH,
+                         ox, oy, z);
             }
         }
-        clean[m] = 0;
-        {   /* greedy word wrap onto the 4-line page */
-            char line[FF4_DLG_COLS + 1];
-            int llen = 0, nl = 0, j;
+        if (dlg_npages > 1) {
+            char mark[8];
+            int ml = snprintf(mark, sizeof mark, "%d/%d",
+                              dlg_curpage + 1, dlg_npages);
 
-            for (k = 0; clean[k] && nl < FF4_DLG_LINES; ++k) {
-                int wlen = 0;
-
-                while (clean[k + wlen] && clean[k + wlen] != ' ')
-                    ++wlen;
-                if (wlen >= FF4_DLG_COLS)
-                    wlen = FF4_DLG_COLS - 1;
-                if (llen && llen + wlen + 1 > FF4_DLG_COLS) {
-                    line[llen] = 0;
-                    for (j = 0; j < llen; ++j)
-                        dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
-                                 FF4_DLG_TEXT_X + j * 8,
-                                 FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
-                                 ox, oy, z);
-                    ++nl;
-                    llen = 0;
-                }
-                while (wlen-- > 0 && clean[k])
-                    line[llen++] = clean[k++];
-                if (llen && llen < FF4_DLG_COLS && clean[k] == ' ')
-                    line[llen++] = ' ';
-                if (llen >= FF4_DLG_COLS) {
-                    line[llen] = 0;
-                    for (j = 0; j < llen; ++j)
-                        dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
-                                 FF4_DLG_TEXT_X + j * 8,
-                                 FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
-                                 ox, oy, z);
-                    ++nl;
-                    llen = 0;
-                }
-            }
-            if (llen && nl < FF4_DLG_LINES) {
-                line[llen] = 0;
-                for (j = 0; j < llen; ++j)
-                    dlg_tile(r, ff4_ascii_to_code[(int)line[j] - 0x20],
-                             FF4_DLG_TEXT_X + j * 8,
-                             FF4_DLG_TEXT_Y0 + nl * FF4_DLG_TEXT_PITCH,
-                             ox, oy, z);
-            }
+            for (col = 0; col < ml; ++col)
+                dlg_tile(r, ff4_ascii_to_code[(int)mark[col] - 0x20],
+                         FF4_DLG_X + FF4_DLG_W - 8 * ml - 8 + col * 8,
+                         FF4_DLG_TOP_Y + FF4_DLG_ROWS * 8 - 16, ox, oy, z);
         }
     }
 }
 
+
+/* draw a string with the window font at (x,y) in the dialog's pixel space */
+static void dlg_text_out(SDL_Renderer *r, int x, int y, const char *t,
+                         int ox, int oy, double z)
+{
+    int col;
+
+    for (col = 0; t[col]; ++col) {
+        int code;
+
+        if ((unsigned char)t[col] < 0x20 || (unsigned char)t[col] >= 0x7F)
+            continue;
+        code = ff4_ascii_to_code[(int)t[col] - 0x20];
+        if (code == 0xFF)
+            continue;
+        dlg_tile(r, code, x + col * 8, y, ox, oy, z);
+    }
+}
+
+/* The menu: an FF4-style window in the top-left, drawn with the same
+ * WindowGfx bank as the message box.  Rows come from the menu engine
+ * (ff4_menu_*, validated by tests/test_menu). */
+static void draw_menu(SDL_Renderer *r, int ox, int oy, double z)
+{
+    int rows = 8, cols = 20;
+    int row, col;
+
+    if (!menu_open)
+        return;
+    rows = pmenu.list.count > 8 ? 8 : pmenu.list.count;
+    if (pmenu.list.count > 0 && pmenu.list.count > 8)
+        rows = 8;
+    if (rows < 3)
+        rows = 3;
+
+    /* the frame */
+    dlg_tile(r, FF4_DLG_TILE_TL, FF4_DLG_X, FF4_DLG_TOP_Y, ox, oy, z);
+    for (col = 1; col < cols - 1; ++col)
+        dlg_tile(r, FF4_DLG_TILE_TOP, FF4_DLG_X + col * 8, FF4_DLG_TOP_Y,
+                 ox, oy, z);
+    dlg_tile(r, FF4_DLG_TILE_TR, FF4_DLG_X + (cols - 1) * 8, FF4_DLG_TOP_Y,
+             ox, oy, z);
+    for (row = 1; row <= rows; ++row) {
+        dlg_tile(r, FF4_DLG_TILE_L, FF4_DLG_X, FF4_DLG_TOP_Y + row * 8,
+                 ox, oy, z);
+        for (col = 1; col < cols - 1; ++col)
+            dlg_tile(r, FF4_DLG_TILE_BODY, FF4_DLG_X + col * 8,
+                     FF4_DLG_TOP_Y + row * 8, ox, oy, z);
+        dlg_tile(r, FF4_DLG_TILE_R, FF4_DLG_X + (cols - 1) * 8,
+                 FF4_DLG_TOP_Y + row * 8, ox, oy, z);
+    }
+    dlg_tile(r, FF4_DLG_TILE_BL, FF4_DLG_X,
+             FF4_DLG_TOP_Y + (rows + 1) * 8, ox, oy, z);
+    for (col = 1; col < cols - 1; ++col)
+        dlg_tile(r, FF4_DLG_TILE_BOT, FF4_DLG_X + col * 8,
+                 FF4_DLG_TOP_Y + (rows + 1) * 8, ox, oy, z);
+    dlg_tile(r, FF4_DLG_TILE_BR, FF4_DLG_X + (cols - 1) * 8,
+             FF4_DLG_TOP_Y + (rows + 1) * 8, ox, oy, z);
+
+    /* the title + rows */
+    if (pmenu.list.title)
+        dlg_text_out(r, FF4_DLG_TEXT_X, FF4_DLG_TOP_Y + 10,
+                     pmenu.list.title, ox, oy, z);
+    for (row = 0; row < rows; ++row) {
+        int idx = pmenu.list.top + row;
+        int y = FF4_DLG_TOP_Y + 26 + row * 16;
+
+        if (idx >= pmenu.list.count)
+            break;
+        if (idx == pmenu.list.cursor)
+            dlg_text_out(r, FF4_DLG_X + 16, y, ">", ox, oy, z);
+        dlg_text_out(r, FF4_DLG_TEXT_X, y,
+                     pmenu.list.rows[idx].text ? pmenu.list.rows[idx].text
+                                               : "", ox, oy, z);
+    }
+    /* the party's gil on the bottom border */
+    {
+        char g[24];
+
+        snprintf(g, sizeof g, "%ug", (unsigned)pg.inventory.gil);
+        dlg_text_out(r, FF4_DLG_X + FF4_DLG_W - 8 * (int)strlen(g) - 8,
+                     FF4_DLG_TOP_Y + (rows + 1) * 8, g, ox, oy, z);
+    }
+}
 
 /* ---------------------------- main -------------------------------- */
 
@@ -2106,10 +2794,12 @@ int main(int argc, char **argv)
         sm_noanim = 1;
     if ((e = getenv("FF4_NPCFREEZE")) && atoi(e))
         npc_frozen = 1;
-    if ((e = getenv("FF4_DIALOG")) && atoi(e)) {
-        dlg_on = 1;
-        dlg_load();
-    }
+    { const char *ks = getenv("FF4_KEYS");
+
+      if (ks && *ks)
+          keys_script_parse(ks); }
+    dlg_load();
+    game_init();
     if ((e = getenv("FF4_FACING")) && *e)
         facing = atoi(e) & 3;
     { const char *aw = getenv("FF4_AUTOWALK");
@@ -2130,10 +2820,22 @@ int main(int argc, char **argv)
     if (run_report_env())
         return 0;
 
+    /* FF4_DIALOG (the locked message-box guard) opens the box on the
+     * nearest NPC's text right after the map loads */
+    if ((e = getenv("FF4_DIALOG")) && atoi(e)) {
+        dlg_on = 1;
+        dlg_load();
+    }
     { const char *wt = getenv("FF4_WARPTO");
 
       if (wt && *wt)
           warp_to_map(atoi(wt)); }
+    if (dlg_on && dlg_text[0]) {
+        char copy[sizeof dlg_text];
+
+        snprintf(copy, sizeof copy, "%s", dlg_text);
+        dlg_set_text(copy);
+    }
 
     /* startup diagnostics: the most common "failed to load" causes are
      * a display server SDL cannot use, or data/ not resolvable from the
@@ -2189,24 +2891,75 @@ int main(int argc, char **argv)
         const Uint8 *keys;
         double dx = 0, dy = 0;
 
+        keys_script_pump();
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 quit = 1;
-            else if (ev.type == SDL_KEYDOWN && ev.key.keysym.scancode <
-                     SDL_NUM_SCANCODES)
-                held[ev.key.keysym.scancode] = 1;
-            else if (ev.type == SDL_KEYUP && ev.key.keysym.scancode <
-                     SDL_NUM_SCANCODES)
-                held[ev.key.keysym.scancode] = 0;
             else if (ev.type == SDL_WINDOWEVENT &&
                      ev.window.event == SDL_WINDOWEVENT_RESIZED) {
                 win_w = ev.window.data1;
                 win_h = ev.window.data2;
-            } else if (ev.type == SDL_KEYDOWN) {
-                SDL_Keycode k = ev.key.keysym.sym;
+            } else if (ev.type == SDL_KEYUP && ev.key.keysym.scancode <
+                       SDL_NUM_SCANCODES) {
+                held[ev.key.keysym.scancode] = 0;
+            } else if (ev.type == SDL_KEYDOWN &&
+                       ev.key.keysym.scancode < SDL_NUM_SCANCODES) {
+                /* ONE handler: the old layout swallowed every keydown in
+                 * the held-state branch above, so T/V/B/1-3 and all the
+                 * playable actions were dead code. */
+                SDL_Keycode k;
 
-                if (k == SDLK_ESCAPE || k == SDLK_q)
-                    quit = 1;
+                held[ev.key.keysym.scancode] = 1;
+                k = ev.key.keysym.sym;
+                if (getenv("FF4_TRACE"))
+                    printf("[key] scancode %d sym %d\n",
+                           (int)ev.key.keysym.scancode, (int)k);
+                /* F-keys by scancode (their SDLK values are masked
+                 * scancodes; comparing scancodes is unambiguous) */
+                if (ev.key.keysym.scancode == SDL_SCANCODE_F5) {
+                    if (!msgbox_active && !menu_open)
+                        game_save();
+                } else if (ev.key.keysym.scancode == SDL_SCANCODE_F9) {
+                    if (!msgbox_active && !menu_open)
+                        game_load();
+                }
+
+                if (k == SDLK_ESCAPE || k == SDLK_q) {
+                    if (menu_open) {
+                        menu_open = 0;
+                    } else if (msgbox_active) {
+                        msgbox_active = 0;
+                        dlg_on = 0;
+                        event_dialog_closed();
+                    } else {
+                        quit = 1;
+                    }
+                } else if (k == SDLK_z || k == SDLK_SPACE) {
+                    if (msgbox_active) {
+                        if (dlg_curpage + 1 < dlg_npages) {
+                            ++dlg_curpage;
+                        } else {
+                            msgbox_active = 0;
+                            dlg_on = 0;
+                            event_dialog_closed();
+                        }
+                    } else if (menu_open) {
+                        menu_feed(FF4_MENU_IN_CONFIRM);
+                    } else {
+                        talk_try();
+                    }
+                } else if (k == SDLK_x || k == SDLK_BACKSPACE) {
+                    if (msgbox_active) {
+                        msgbox_active = 0;
+                        dlg_on = 0;
+                        event_dialog_closed();
+                    } else if (menu_open) {
+                        menu_feed(FF4_MENU_IN_CANCEL);
+                    }
+                } else if (k == SDLK_RETURN) {
+                    if (!msgbox_active && !menu_open)
+                        menu_try_open();
+                }
                 else if (k == SDLK_t)
                     whole_map = !whole_map;
                 else if (k == SDLK_v) {
@@ -2241,7 +2994,26 @@ int main(int argc, char **argv)
         }
 
         keys = held;
-        if (!in_world) {
+        keys_script_apply((Uint8 *)keys);
+        if (menu_open) {
+            /* the menu takes the d-pad (one step per press: the script
+             * holds keys for N frames, so latch on the edge) */
+            static int pl = 0, pr = 0, pu = 0, pd = 0;
+            int nl = keys[SDL_SCANCODE_LEFT], nr = keys[SDL_SCANCODE_RIGHT];
+            int nu = keys[SDL_SCANCODE_UP], nd = keys[SDL_SCANCODE_DOWN];
+
+            if (nl && !pl) menu_feed(FF4_MENU_IN_LEFT);
+            if (nr && !pr) menu_feed(FF4_MENU_IN_RIGHT);
+            if (nu && !pu) menu_feed(FF4_MENU_IN_UP);
+            if (nd && !pd) menu_feed(FF4_MENU_IN_DOWN);
+            pl = nl; pr = nr; pu = nu; pd = nd;
+            ++party_frame;
+            if (talk_cooldown > 0)
+                --talk_cooldown;
+        } else if (msgbox_active || erun_active) {
+            /* the message box and event scripts hold the party still */
+            ++party_frame;
+        } else if (!in_world) {
             /* sub-map movement: 1 px per frame, cell-gated by .walk */
             double dx = 0, dy = 0;
 
@@ -2279,10 +3051,22 @@ int main(int argc, char **argv)
                             player_z = sm_props[nc2 * 2] & 3;
                         k = sm_trig_find((int)ax / 16, (int)ay / 16);
 
-                        if (k >= 0)
-                            trigger_warp(sm_trig[k].map, sm_trig[k].dx,
-                                         sm_trig[k].dy, sm_trig[k].dir,
-                                         sm_trig[k].event);
+                        if (k >= 0) {
+                            int rm = sm_trig[k].map;
+
+                            if (rm == 0xFF) {
+                                /* on-enter script: id in xDest */
+                                event_start(sm_trig[k].dx & 0xFF);
+                            } else if (rm == 0xFE) {
+                                /* a walkable chest cell still opens */
+                                chest_open((int)ax / 16, (int)ay / 16,
+                                           sm_trig[k].dx, sm_trig[k].dy);
+                            } else {
+                                trigger_warp(rm, sm_trig[k].dx,
+                                             sm_trig[k].dy, sm_trig[k].dir,
+                                             sm_trig[k].event);
+                            }
+                        }
                         else if (sm_props[((int)ay / 16 * 32 +
                                            (int)ax / 16) * 2 + 1] & 0x10)
                             exit_tile_fire((int)ax / 16, (int)ay / 16);
@@ -2290,7 +3074,9 @@ int main(int argc, char **argv)
                 }
             }
             update_camera_sm();
-            ++frame_counter;
+            /* NOTE: no ++frame_counter here - the loop's single global
+             * increment keeps frame numbers exact for FF4_KEYS (a double
+             * increment skipped scripted frames) */
         } else if (autowalk >= 0 && !tile_report) {
             /* headless traversal on the world map too */
             static const Uint8 up[] = { [SDL_SCANCODE_UP] = 1 };
@@ -2348,6 +3134,8 @@ int main(int argc, char **argv)
             ++party_frame;            /* $7b free-run */
         }
 
+        event_pump();
+
         /* the warp curtain: apply at the midpoint (16 of 32) */
         if (warp_frames_cur >= 0) {
             curtain_this_frame = 1;
@@ -2375,6 +3163,9 @@ int main(int argc, char **argv)
             update_camera();
         else
             update_camera_sm();
+        if (talk_cooldown > 0)
+            --talk_cooldown;
+        game_sync_position();
 
         /* ---- draw ---- */
         SDL_SetRenderDrawColor(ren, 0, 0, 0, 0xFF);
@@ -2424,6 +3215,15 @@ int main(int argc, char **argv)
                 SDL_SetRenderDrawColor(ren, 0xFF, 0xE0, 0x00, 0xFF);
                 SDL_RenderDrawRect(ren, &rc);
             }
+        }
+        if (in_world && !whole_map) {
+            int mox = (win_w - (int)(vw * zoom)) / 2;
+            int moy = (win_h - (int)(vh * zoom)) / 2;
+
+            if (dlg_on)
+                draw_dialog(ren, mox, moy, zoom);
+            if (menu_open)
+                draw_menu(ren, mox, moy, zoom);
         }
         SDL_RenderPresent(ren);
 
